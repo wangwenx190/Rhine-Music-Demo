@@ -1,0 +1,84 @@
+{
+  "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
+  "seed": 417,
+  "sources": {
+    "src/scene.ts": "cd212bd9a40ea2323e21ad3008a025dd5a5874cb5d095f53375986122743d541",
+    "src/render-quality.ts": "862758c9e4c1c272ba10f44c2c58746b53b62ac42d2d7d8776eca0fc349118de",
+    "src/music-lighting.ts": "5a8d6110900ce1e1b6c7872db56e2a6030513d8565d5a1f67d4266a2704f276b",
+    "src/cover-atlas.ts": "db618e47e44f9e3a4197e26d297345b3693ce5ff7067608f9966be3bc5b75910"
+  },
+  "algorithms": {
+    "upstream:node_modules/three/examples/jsm/postprocessing/SSAOPass.js": "59944f833d10330f6bdd205260ad06a8ef2bd12a115e4101d81578b249627e3f",
+    "upstream:node_modules/three/examples/jsm/shaders/SSAOShader.js": "034dad98927ed8f2677a19ce56d4da1212ce5070ed2666157106025dc260bb55",
+    "upstream:node_modules/three/examples/jsm/math/SimplexNoise.js": "4b1455617135e6b477de76244de07547d95570643379b72f4758e50161b06072"
+  },
+  "assets": [
+    {
+      "path": "environment/ssao-kernel-16.rgba32f",
+      "width": 16,
+      "height": 1,
+      "format": "RGBA32F little-endian",
+      "bytes": 256,
+      "sha256": "4d98aab62d1a9fc85b013f4687ba5922c6cf6e33f9084051923ccee5972bc153"
+    },
+    {
+      "path": "environment/ssao-noise-16.rgba32f",
+      "width": 4,
+      "height": 4,
+      "format": "RGBA32F little-endian",
+      "bytes": 256,
+      "sha256": "351196079e378dc4221bcb2d7fc0804ca1e5c53141ec41f020bc089e16082f67"
+    },
+    {
+      "path": "environment/ssao-kernel-32.rgba32f",
+      "width": 32,
+      "height": 1,
+      "format": "RGBA32F little-endian",
+      "bytes": 512,
+      "sha256": "cb602c8eeb2d8c9bb16d40a5a72e9bb033bcf169dc0c4e48af23505fa363d501"
+    },
+    {
+      "path": "environment/ssao-noise-32.rgba32f",
+      "width": 4,
+      "height": 4,
+      "format": "RGBA32F little-endian",
+      "bytes": 256,
+      "sha256": "fa06bfeaca37f97b7cf164c63df4bdb77fe84bad007a65c22df48ba3a2ad8224"
+    },
+    {
+      "path": "environment/ssao-kernel-64.rgba32f",
+      "width": 64,
+      "height": 1,
+      "format": "RGBA32F little-endian",
+      "bytes": 1024,
+      "sha256": "c9322ee53d5850087e1f6370d59048b7557307f3289d0d264c0d2dc383970960"
+    },
+    {
+      "path": "environment/ssao-noise-64.rgba32f",
+      "width": 4,
+      "height": 4,
+      "format": "RGBA32F little-endian",
+      "bytes": 256,
+      "sha256": "a13d882d6c8cc620560cca961c1c8ff6c63835faee61ff488ed40b1eb5a0b360"
+    }
+  ],
+  "license": "Three MIT; resources/licenses/three-LICENSE",
+  "effective": {
+    "kernelRadius": 0.18,
+    "minDistance": 0.001,
+    "maxDistance": 0.035,
+    "aoStrength": 0.22,
+    "shadowIntensity": 0.32,
+    "normalBias": 0.035,
+    "bias": -0.0003,
+    "radius": 4,
+    "projection": {
+      "left": -16,
+      "right": 16,
+      "bottom": -15,
+      "top": 15,
+      "near": 0.1,
+      "far": 45
+    }
+  }
+}

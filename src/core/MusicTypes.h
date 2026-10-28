@@ -1,0 +1,94 @@
+// Defines library value records and immutable shared snapshots. Parsing validates a candidate
+// before publication and preserves unknown JSON fields.
+
+#pragma once
+
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QList>
+#include <QMetaType>
+#include <QStringList>
+#include <QUrl>
+#include <memory>
+#include <optional>
+
+namespace yalahoo {
+enum class MediaSupport {
+    Unknown,
+    Supported,
+    Unsupported
+};
+struct Track final
+{
+    QString id, albumId, title, artist, format, codec, relativePath;
+    std::optional<int> trackNumber, discNumber, bitsPerSample, sampleRate, bitrate;
+    std::optional<bool> lossless;
+    double duration = 0;
+    MediaSupport mediaSupport = MediaSupport::Unknown;
+    QUrl sourceUrl;
+    QJsonObject fields;
+    bool operator==(const Track &) const = default;
+};
+struct Producer final
+{
+    QString name, role, source, trackId, trackTitle, url;
+    QJsonObject fields;
+    bool operator==(const Producer &) const = default;
+};
+struct Album final
+{
+    QString id, title, artist, genreId, description, localNote, folderLabel;
+    std::optional<int> year, discCount;
+    QStringList rawGenres;
+    QUrl folder, coverUrl;
+    QList<Track> tracks;
+    QList<Producer> producers;
+    QJsonObject descriptionSource, introduction, creditsLookup, online;
+    bool offline = false;
+    QJsonObject fields;
+};
+struct Genre final
+{
+    QString id, name;
+    QStringList aliases;
+    std::optional<int> albumCount;
+    QJsonObject fields;
+    bool operator==(const Genre &) const = default;
+};
+struct LibraryRoot final
+{
+    QUrl path;
+    QString status, error;
+    QJsonObject fields;
+    bool operator==(const LibraryRoot &) const = default;
+};
+struct LibrarySnapshot final
+{
+    QList<Album> albums;
+    QList<Genre> genres;
+    QList<LibraryRoot> roots;
+    QJsonObject scan, enrich, introductions, credits, fields;
+    bool onlineEnabled = false;
+    const Album *album(const QString &id) const;
+    const Track *track(const QString &albumId, const QString &trackId) const;
+};
+using Snapshot = std::shared_ptr<const LibrarySnapshot>;
+
+// Transactional parsing: malformed input never replaces the caller's snapshot.
+bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *error = nullptr);
+QJsonArray producerData(const QList<Producer> &producers);
+QJsonObject toJson(const Track &track);
+QJsonObject toJson(const Album &album);
+QJsonObject toJson(const LibrarySnapshot &library);
+QString supportName(MediaSupport support);
+struct AlbumTitleParts final
+{
+    QString main, translation;
+};
+AlbumTitleParts albumTitleParts(const QString &text);
+QString graphemePrefix(const QString &text, qsizetype maxCodeUnits);
+}
+
+namespace yalahoo::libraryDefaults {
+inline constexpr auto UnnumberedTrackSortKey = 9999;
+}

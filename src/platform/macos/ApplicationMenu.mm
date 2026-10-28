@@ -1,0 +1,266 @@
+#include "ApplicationMenu.h"
+#include <QCoreApplication>
+#include <QGuiApplication>
+#include <QMetaObject>
+#include <QPointer>
+#include <QQuickWindow>
+#include <QVariant>
+#include <utility>
+#import <AppKit/AppKit.h>
+
+using namespace Qt::StringLiterals;
+
+@interface YalahooMenuTarget : NSObject <NSMenuItemValidation> {
+@public
+    QPointer<QQuickWindow> window;
+    std::function<void()> settings;
+    std::function<bool()> settingsEnabled;
+}
+- (void)openSettings:(id)sender;
+- (void)closeWindow:(id)sender;
+- (void)minimizeWindow:(id)sender;
+- (void)zoomWindow:(id)sender;
+- (void)quit:(id)sender;
+- (void)edit:(NSMenuItem *)sender;
+@end
+
+namespace {
+// Tags identify menu commands independently of their localized titles and native selectors.
+enum EditCommand {
+    UndoCommand = 1,
+    RedoCommand,
+    CutCommand,
+    CopyCommand,
+    PasteCommand,
+    SelectAllCommand
+};
+constexpr NSInteger EditCommandCount = 6;
+
+const char *editMethod(NSInteger tag)
+{
+    switch (tag) {
+    case UndoCommand:
+        return "undo";
+    case RedoCommand:
+        return "redo";
+    case CutCommand:
+        return "cut";
+    case CopyCommand:
+        return "copy";
+    case PasteCommand:
+        return "paste";
+    case SelectAllCommand:
+        return "selectAll";
+    default:
+        return nullptr;
+    }
+}
+QObject *editor(QQuickWindow *window)
+{
+    auto *focus = window ? window->focusObject() : nullptr;
+    return focus && focus->metaObject()->indexOfMethod("selectAll()") >= 0 ? focus : nullptr;
+}
+NSWindow *nativeWindow(QQuickWindow *window)
+{
+    if (!window || !window->handle())
+        return nil;
+    auto *view = reinterpret_cast<NSView *>(window->winId());
+    return view.window;
+}
+bool nativeDialog(QQuickWindow *window)
+{
+    auto *owner = nativeWindow(window);
+    return NSApp.modalWindow || owner.attachedSheet
+            || (NSApp.keyWindow && NSApp.keyWindow != owner);
+}
+SEL nativeEditMethod(NSInteger tag)
+{
+    const auto *method = editMethod(tag);
+    return method ? NSSelectorFromString(QString::fromUtf8(method).append(':'_L1).toNSString())
+                  : nil;
+}
+bool nativeEditEnabled(NSMenuItem *item)
+{
+    const SEL selector = nativeEditMethod(item.tag);
+    id target = selector ? [NSApp targetForAction:selector to:nil from:item] : nil;
+    if (!target)
+        return false;
+    // Cocoa text fields in native file dialogs keep their own editing semantics.
+    auto *nativeItem = [[[NSMenuItem alloc] initWithTitle:item.title
+                                                   action:selector
+                                            keyEquivalent:item.keyEquivalent] autorelease];
+    if ([target respondsToSelector:@selector(validateMenuItem:)])
+        return [target validateMenuItem:nativeItem];
+    if ([target respondsToSelector:@selector(validateUserInterfaceItem:)])
+        return [target validateUserInterfaceItem:nativeItem];
+    return true;
+}
+NSMenu *addMenu(NSMenu *bar, NSString *title)
+{
+    auto *item = [[[NSMenuItem alloc] initWithTitle:title action:nil
+                                      keyEquivalent:@""] autorelease];
+    auto *menu = [[[NSMenu alloc] initWithTitle:title] autorelease];
+    item.submenu = menu;
+    [bar addItem:item];
+    return menu;
+}
+NSMenuItem *addItem(NSMenu *menu, NSString *title, NSString *key, SEL action, id target)
+{
+    auto *item = [[[NSMenuItem alloc] initWithTitle:title action:action
+                                      keyEquivalent:key] autorelease];
+    item.target = target;
+    [menu addItem:item];
+    return item;
+}
+}
+
+@implementation YalahooMenuTarget
+- (BOOL)validateMenuItem:(NSMenuItem *)item
+{
+    if (item.action == @selector(quit:))
+        return YES;
+    if (!window)
+        return NO;
+    if (nativeDialog(window))
+        return item.action == @selector(edit:) && nativeEditEnabled(item);
+    if (item.action == @selector(openSettings:))
+        return settingsEnabled && settingsEnabled();
+    if (item.action != @selector(edit:))
+        return window->isVisible();
+    auto *focus = editor(window);
+    const auto *method = editMethod(item.tag);
+    if (!focus || !method || focus->metaObject()->indexOfMethod(QByteArray(method) + "()"_ba) < 0)
+        return NO;
+    if (item.tag == CopyCommand)
+        return !focus->property("selectedText").toString().isEmpty();
+    if (item.tag == SelectAllCommand)
+        return !focus->property("text").toString().isEmpty();
+    if (focus->property("readOnly").toBool())
+        return NO;
+    if (item.tag == UndoCommand)
+        return focus->property("canUndo").toBool();
+    if (item.tag == RedoCommand)
+        return focus->property("canRedo").toBool();
+    if (item.tag == CutCommand)
+        return !focus->property("selectedText").toString().isEmpty();
+    return focus->property("canPaste").toBool();
+}
+- (void)openSettings:(id)sender
+{
+    Q_UNUSED(sender);
+    if (window && !nativeDialog(window) && settings && settingsEnabled && settingsEnabled())
+        settings();
+}
+- (void)closeWindow:(id)sender
+{
+    Q_UNUSED(sender);
+    if (window)
+        window->close();
+}
+- (void)minimizeWindow:(id)sender
+{
+    Q_UNUSED(sender);
+    if (window)
+        window->showMinimized();
+}
+- (void)zoomWindow:(id)sender
+{
+    Q_UNUSED(sender);
+    if (window) {
+        if (window->visibility() == QWindow::Maximized)
+            window->showNormal();
+        else
+            window->showMaximized();
+    }
+}
+- (void)quit:(id)sender
+{
+    Q_UNUSED(sender);
+    QCoreApplication::quit();
+}
+- (void)edit:(NSMenuItem *)sender
+{
+    if (![self validateMenuItem:sender])
+        return;
+    if (nativeDialog(window)) {
+        [NSApp sendAction:nativeEditMethod(sender.tag) to:nil from:sender];
+        return;
+    }
+    if (auto *focus = editor(window))
+        QMetaObject::invokeMethod(focus, editMethod(sender.tag), Qt::DirectConnection);
+}
+@end
+
+namespace yalahoo {
+struct ApplicationMenu::Private final
+{
+    Q_DISABLE_COPY_MOVE(Private)
+    Private() = default;
+    NSMenu *previous = nil;
+    NSMenu *bar = nil;
+    YalahooMenuTarget *target = nil;
+    ~Private()
+    {
+        if (NSApp.mainMenu == bar)
+            NSApp.mainMenu = previous;
+        [bar release];
+        [target release];
+        [previous release];
+    }
+};
+ApplicationMenu::ApplicationMenu(QQuickWindow &window, std::function<void()> settings,
+                                 std::function<bool()> settingsEnabled)
+    : d(std::make_unique<Private>())
+{
+    d->previous = [NSApp.mainMenu retain];
+    d->target = [[YalahooMenuTarget alloc] init];
+    d->target->window = &window;
+    d->target->settings = std::move(settings);
+    d->target->settingsEnabled = std::move(settingsEnabled);
+    d->bar = [[NSMenu alloc] initWithTitle:@"yalahOO!!!"];
+    auto *application = addMenu(d->bar, @"yalahOO!!!");
+    addItem(application, QCoreApplication::translate("Yalahoo", "Settings...").toNSString(), @",",
+            @selector(openSettings:), d->target);
+    [application addItem:[NSMenuItem separatorItem]];
+    addItem(application, QCoreApplication::translate("Yalahoo", "Hide yalahOO!!!").toNSString(),
+            @"h", @selector(hide:), NSApp);
+    auto *hideOthers =
+            addItem(application, QCoreApplication::translate("Yalahoo", "Hide Others").toNSString(),
+                    @"h", @selector(hideOtherApplications:), NSApp);
+    hideOthers.keyEquivalentModifierMask = NSEventModifierFlagCommand | NSEventModifierFlagOption;
+    addItem(application, QCoreApplication::translate("Yalahoo", "Show All").toNSString(), @"",
+            @selector(unhideAllApplications:), NSApp);
+    [application addItem:[NSMenuItem separatorItem]];
+    addItem(application, QCoreApplication::translate("Yalahoo", "Quit yalahOO!!!").toNSString(),
+            @"q", @selector(quit:), d->target);
+    auto *file = addMenu(d->bar, QCoreApplication::translate("Yalahoo", "File").toNSString());
+    addItem(file, QCoreApplication::translate("Yalahoo", "Close").toNSString(), @"w",
+            @selector(closeWindow:), d->target);
+    auto *edit = addMenu(d->bar, QCoreApplication::translate("Yalahoo", "Edit").toNSString());
+    const NSArray<NSString *> *titles = @[
+        QCoreApplication::translate("Yalahoo", "Undo").toNSString(),
+        QCoreApplication::translate("Yalahoo", "Redo").toNSString(),
+        QCoreApplication::translate("Yalahoo", "Cut").toNSString(),
+        QCoreApplication::translate("Yalahoo", "Copy").toNSString(),
+        QCoreApplication::translate("Yalahoo", "Paste").toNSString(),
+        QCoreApplication::translate("Yalahoo", "Select All").toNSString()
+    ];
+    const NSArray<NSString *> *keys = @[ @"z", @"z", @"x", @"c", @"v", @"a" ];
+    for (NSInteger index = 0; index < EditCommandCount; ++index) {
+        auto *item = addItem(edit, titles[index], keys[index], @selector(edit:), d->target);
+        item.tag = index + 1;
+        if (index + 1 == RedoCommand)
+            item.keyEquivalentModifierMask = NSEventModifierFlagCommand | NSEventModifierFlagShift;
+        if (index + 1 == RedoCommand || index + 1 == PasteCommand)
+            [edit addItem:[NSMenuItem separatorItem]];
+    }
+    auto *windowMenu =
+            addMenu(d->bar, QCoreApplication::translate("Yalahoo", "Window").toNSString());
+    addItem(windowMenu, QCoreApplication::translate("Yalahoo", "Minimize").toNSString(), @"m",
+            @selector(minimizeWindow:), d->target);
+    addItem(windowMenu, QCoreApplication::translate("Yalahoo", "Zoom").toNSString(), @"",
+            @selector(zoomWindow:), d->target);
+    NSApp.mainMenu = d->bar;
+}
+ApplicationMenu::~ApplicationMenu() = default;
+}

@@ -1,0 +1,73 @@
+# 原生Kit、工程与构建
+
+本文只维护Kit发现、C++23能力、构建/模块与开发运行。产品范围见[product.md](product.md)，渲染接线见rhi-integration.md，组件验证见各契约。
+
+- 目标身份及初始化顺序见[product.md](product.md#技术身份)。默认应用产物输出：`build/<configuration>/bin/yalahoo.exe`，macOS 为同位置的 `yalahoo.app`，Linux 为 `yalahoo`。
+- QML模块入口见product.md；编译资源为`:/qt/qml/Yalahoo/Music/App.qml`。源目录中的 `App.qml` 设置相对别名，不依赖当前工作目录。
+- 非 QML shader：`resources/shaders/reel-slot.frag` → 同 Kit `qsb` → `:/assets/shaders/reel-slot.frag.qsb`。Qt 标准默认变体包含 SPIR-V、GLSL、HLSL、MSL。
+- 默认/可选API与能力探测/回退由[render-backend.md](render-backend.md)维护；界面/输入使用逻辑像素，平台API和Qt私有头只在既有适配层隔离。平台选项在 `cmake/Platform.cmake` 隔离，macOS bundle 使用 `cmake/Info.plist.in`。
+
+## 最新 Kit 与编译器
+
+公共 presets 保留 `qt-debug` / `qt-release`，分别输出到 `build/debug/` / `build/release/`。常规构建、测试、GUI/性能验证与验收只使用 Release；只有明确需要获取堆栈时才编译和运行 Debug，不执行例行双配置验证。Qt 模块不固定 minor/patch 或安装目录。`cmake/QtKit.cmake` 读取本机 Qt CMake 配置的真实版本，与每个 Kit 自带 `qmake -query QT_VERSION` 交叉核对；用 qconfig 架构/交叉编译标记及 `QMAKE_XSPEC` 排除 Android/Wasm/交叉 Kit。按数值版本选原生平台/架构的最高版本，再验证 ABI 和全部必需模块。最新 Kit 缺模块或 ABI 不匹配会报错，不退回旧版。
+
+可通过本机环境 `YALAHOO_QT_ROOTS` 或被忽略的 `CMakeUserPresets.json` 中同名 cache variable 增加安装根，列表分隔符为分号。可设置 `YALAHOO_QT_KIT` 显式前缀，但它必须等于已发现的最新 Kit；自定义 Kit 路径不会绕过已安装版本枚举。默认搜索 Qt 官方安装布局的 `C:/Qt` / 用户 Qt 目录、Unix 用户 Qt 目录和 `/opt/Qt`、`/usr/local/Qt`。系统发行版的非标准布局须提供具有 Qt CMake、mkspec 与 qmake 的完整前缀；不混用任意 PATH 中的 Qt 工具。
+
+configure 每次重新发现 Kit；旧 `YALAHOO_SELECTED_QT`、任意已缓存的 `Qt6*_DIR` 或显式过期前缀都会阻止配置。升级后移除旧覆盖并执行 `cmake --preset qt-release --fresh`。qmake、qmllint、qsb 从该 Kit 的 bin/libexec 定位并校验实际版本；构建用的 Qt imported tool targets 来自同一套配置。balsam 和部署工具在执行对应资产/部署轮次时加入同 Kit 校验。
+
+C++23 required、无扩展，并实际编译 `std::to_underlying` 和 `std::optional::transform`。MSVC 的 CMake C++23 映射可能为 `/std:c++latest`；能力探针失败时配置直接停止。Windows 脚本通过 vswhere 找实际 VS C++ 安装，导入 VsDevCmd 环境到当前进程；CMake/Ninja 从现有 PATH 或标准 CMake 安装位置发现，不修改全局环境。
+
+## Release代码优化
+
+`cmake/Optimization.cmake`在创建目标前统一设置优化，覆盖生产、生成QML、工具与测试。Release默认开启`CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE`，由`YALAHOO_RELEASE_IPO`控制；配置用CMake `CheckIPOSupported`实际编译/链接探测C++，macOS另对Objective-C++的实际LTO flags编译/链接探测，失败明确报错。其他配置不自动启用IPO或下列Release折叠/清理选项。
+
+- Windows/MSVC：`/Gy /Gw`分离COMDAT，链接`/OPT:REF /OPT:ICF`清除未引用项并合并相同代码/只读数据。
+- macOS/AppleClang：链接`-deduplicate -dead_strip`，配置先验证所选linker接受这些选项；C++与Objective-C++均使用同一Release IPO策略。
+- Linux：`-ffunction-sections -fdata-sections`及`--gc-sections`；GCC显式`-fipa-icf`并与IPO共同处理跨翻译单元，Clang用`--icf=safe`，当前linker不支持时探测LLVM lld，缺能力报错，IPO探测使用相同linker。
+
+构建期死代码清理与部署期strip各有职责；UNIX部署的包内路径和strip操作由对应[macOS](../platforms/macos.md)、[Linux](../platforms/linux.md)平台文档维护。
+
+## 构建、测试与运行
+
+Windows 在 PowerShell 7.2 或更新版本中执行：
+
+```powershell
+./tools/build/build.ps1 -Preset qt-release -Action Configure
+./tools/build/build.ps1 -Preset qt-release -Action Build
+```
+
+Configure与Build分别配置和构建；省略Action时默认All，另运行整个fast预置，只有明确需要该范围时使用。定向测试直接调用CTest。手工配置/构建时，先在当前PowerShell dot-source编译器环境：
+
+```powershell
+. ./tools/build/enter-msvc.ps1
+cmake --preset qt-release
+cmake --build --preset qt-release
+ctest --preset qt-release -R '对应受影响测试' --output-on-failure
+```
+
+开发运行使用选中 Kit 的 DLL/插件。独立Windows部署与干净环境入口见[Windows平台操作](../platforms/windows.md)；普通启动器优先选择完整部署包。手动开发启动可从cache获取前缀：
+
+```powershell
+$selectedKit = (Get-Content build/release/CMakeCache.txt | Select-String '^YALAHOO_SELECTED_QT:PATH=(.*)$').Matches.Groups[1].Value
+$env:PATH = "$selectedKit/bin;$env:PATH"
+$env:QT_PLUGIN_PATH = "$selectedKit/plugins"
+& ./build/release/bin/yalahoo.exe
+```
+
+macOS 使用 `sh tools/build/macos.sh`，Linux 使用 `sh tools/build/linux.sh`；构建脚本不隐式运行测试，按test-gates.md选择受影响项。独立macOS部署使用 `sh tools/deploy/macos.sh`；详见对应平台操作。原生程序不依赖 Node、浏览器或 HTTP 服务。构建及维护入口不需要旧工程、Git历史、npm依赖或浏览器。
+
+回归可执行文件输出到`build/<configuration>/tests/`，资产工具与显式来源/网络探针输出到`build/<configuration>/tools/`；下文及组件契约中的裸可执行名均从对应目录调用，Windows附加`.exe`。
+
+Review另要求同Kit的Quick3DPrivate/Quick3DRuntimeRenderPrivate，仅用于隔离的Review MSAA能力与真实附件探针；`YALAHOO_REVIEW_MSAA_API`配置期按实际头文件编译，缺失时明确失败，不降级Kit。普通产品不链接这些Review模块。
+
+开发Kit还须提供LinguistTools；同Kit的lupdate/lrelease由CMake翻译targets调用，生成QM嵌入产品资源，播放器不依赖这些开发工具。翻译源、加载与字符串编译闸门见[qt-best-practices.md](qt-best-practices.md#翻译和构建闸门)。
+
+基础CTest覆盖Kit数值排序/平台/架构/ABI/模块/过期覆盖、身份/模块插件和qsb变体；具体选择见test-gates.md，格式命令见code-style.md。
+
+`--verify-app`隐藏创建生产根，`--verify-deployment 报告路径`检查包内资源、依赖及媒体加载；实际交互、算法和输出使用test-gates.md索引的组件入口。
+
+## 启动入口
+
+根`yalahoo.command`/`yalahoo.sh`/`yalahoo.ps1`启动普通原生音乐入口；`tools/launchers/demo.*`与`lighting-lab.*`分别传`--demo`和`--lighting-lab`。共用run-native脚本相对自身位置解析Release产物与cache中所选Kit，保留参数、Unicode/空格路径及进程退出码；三平台优先选择完整生产部署包；开发回退核对Release产物与Kit，部署运行清除外部Qt/QML查找覆盖。macOS的开发bundle路径为`build/release/bin/yalahoo.app/Contents/MacOS/yalahoo`，不直接执行`.app`目录。PowerShell使用Process对象等待GUI进程且只修改子进程环境。开发启动器不自动构建或发布。
+
+`--demo`与`--lighting-lab`只创建九列二十七张匿名qrc封面专辑，不读取/保存偏好或真实库，不扫描、不自动启动歌曲/BGM/音效；后者额外展开实验容器。不能与数据根、扫描/导入或验证参数组合。普通入口的设置按钮仍可打开同一调节面板。启动模式不改变渲染后端、普通片头或已有播放接口；演示曲目为空，不能伪装真实歌曲来源。

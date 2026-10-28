@@ -1,0 +1,75 @@
+#version 440
+#extension GL_GOOGLE_include_directive : require
+#include "frame.glsl"
+layout(binding = 1) uniform sampler2D coverMap;
+layout(binding = 2) uniform sampler2D environmentMap;
+layout(binding = 3) uniform sampler2DShadow shadowMap;
+layout(location = 0) centroid in vec2 paperUv;
+layout(location = 1) in vec3 world;
+layout(location = 2) in vec3 worldNormal;
+layout(location = 3) in vec3 viewNormal;
+layout(location = 4) in float viewDepth;
+layout(location = 5) in vec3 localPosition;
+layout(location = 9) in vec4 shadowCoord;
+layout(location = 6) flat in vec4 entityLight0;
+layout(location = 7) flat in vec4 entityLight1;
+layout(location = 8) flat in vec4 entityCoverUv;
+layout(location = 0) out vec4 color;
+layout(location = 1) out vec4 normalOut;
+layout(location = 2) out vec4 depthOut;
+#include "paper-lighting.glsl"
+#include "fog.glsl"
+#include "shadow-filter.glsl"
+#include "floor-lighting.glsl"
+#include "cover-sampling.glsl"
+void main()
+{
+    if (f.draw.x < -.5) {
+        color = vec4(f.background.rgb, 1);
+        normalOut = color;
+        depthOut = vec4(1);
+        return;
+    }
+    normalOut = vec4(normalize(viewNormal) * .5 + .5, 1);
+    depthOut = vec4(packDepth((viewDepth - f.clip.x) / (f.clip.y - f.clip.x)), 1);
+    if (f.draw.x > 5.5) {
+        vec3 outgoing = floorRadiance(normalize(worldNormal), normalize(f.camera.xyz - world));
+        color = vec4(sceneFog(outgoing, viewDepth), 1);
+        return;
+    }
+    if (f.draw.x > 1.5) {
+        color = vec4(vec3(shadowFactor()), 1);
+        return;
+    }
+    if (f.draw.x > .5) {
+        color = normalOut;
+        return;
+    }
+    vec2 size = f.paperSize.xy;
+    if (entityCoverUv.z <= 0.0 || entityCoverUv.w <= 0.0)
+        discard;
+    vec2 extent = f.paperSize.z > .5 ? vec2(1.0) : (1.0 - 2.0 / 64.0) * size / max(size.x, size.y);
+    vec2 uv = (paperUv - .5) / extent + .5;
+    vec2 coverDx = dFdx(uv), coverDy = dFdy(uv);
+    if (any(lessThan(uv, vec2(0))) || any(greaterThan(uv, vec2(1))))
+        discard;
+    vec4 ink = f.fog.w > .5 ? filteredCover(uv, coverDx, coverDy) : coverLevel(uv, 0);
+    if (ink.a < .025)
+        discard;
+    // Keep transparent helper lanes finite as well as the surviving fragments.
+    ink.rgb /= max(ink.a, .025);
+    vec3 source = ink.rgb, n = normalize(worldNormal);
+    if (f.areaTarget.w < .5) {
+        color = vec4(sceneFog(source, viewDepth), 1);
+        return;
+    }
+    vec3 irradiance =
+            musicIrradiance(world, n) + textureCubeUV(environmentMap, n, 1.0).rgb * f.settings.w;
+    float keyCosine = max(0.0, dot(n, normalize(vec3(-6, 14, -5))));
+    if (keyCosine > 0.0)
+        irradiance -= f.keyColor.rgb * f.lightIntensities.x * keyCosine * (1.0 - shadowFactor())
+                / 3.141592653589793;
+    vec3 outgoing =
+            min(source * max(irradiance, vec3(0)), source) * musicPrintExposure(f.model[3].xyz);
+    color = vec4(sceneFog(outgoing, viewDepth), 1);
+}

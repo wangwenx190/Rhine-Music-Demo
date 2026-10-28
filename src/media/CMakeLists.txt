@@ -1,0 +1,9 @@
+target_sources(YalahooCore PRIVATE MediaMetadataProbe.cpp MediaMetadataProbe.h
+    AudioOutputChanges.h
+    PlaybackQueue.cpp PlaybackQueue.h
+    AudioPreferencesBinding.cpp AudioPreferencesBinding.h
+    PlaybackController.cpp PlaybackController.h
+    BackgroundMusicController.cpp BackgroundMusicController.h
+    InterfaceSoundController.cpp InterfaceSoundController.h)
+target_link_libraries(YalahooCore PUBLIC Qt6::Multimedia)
+target_include_directories(YalahooCore PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")

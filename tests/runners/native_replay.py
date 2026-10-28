@@ -1,0 +1,131 @@
+"""Common Release replay transport; component validators own their assertions."""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import platform
+import subprocess
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
+from report_values import finite_number, read_report
+
+ROOT = Path(__file__).resolve().parents[2]
+BACKEND_IDS = {"metal": 6, "d3d11": 4, "d3d12": 8, "opengl": 3, "vulkan": 5}
+QML_ERRORS = ("Binding loop", "Cannot assign", "ReferenceError", "TypeError", "Failed to compile")
+VIEWPORTS = ((1920, 1080), (1280, 720), (995, 858), (960, 900), (930, 900),
+             (390, 844), (320, 720), (2560, 1080), (3440, 1440))
+MAXIMUM_RUNS = 10
+REPLAY_TIMEOUT_SECONDS = 150
+
+
+def write_json(path, value):
+    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def matching_number(value, expected):
+    return finite_number(value) and value == expected
+
+
+def run_logged(command, log_path, *, cwd, environment, timeout):
+    with log_path.open("w", encoding="utf-8") as log:
+        try:
+            return subprocess.run(command, cwd=cwd, env=environment, stdout=log,
+                                  stderr=subprocess.STDOUT, timeout=timeout, check=False).returncode
+        except subprocess.TimeoutExpired:
+            return "timeout"
+        except OSError as error:
+            log.write(f"Cannot launch verification process: {error}\n")
+            return "launch-error"
+
+
+def executable_path(root=ROOT, tool=None):
+    if tool:
+        return root / "build/release/tests" / (tool + (".exe" if platform.system() == "Windows" else ""))
+    relative = {"Darwin": "yalahoo.app/Contents/MacOS/yalahoo", "Windows": "yalahoo.exe"}
+    return root / "build/release/bin" / relative.get(platform.system(), "yalahoo")
+
+
+def cmake_cache(root=ROOT):
+    lines = (root / "build/release/CMakeCache.txt").read_text(encoding="utf-8").splitlines()
+    return dict(line.split("=", 1) for line in lines if "=" in line and not line.startswith(("#", "//")))
+
+
+def replay_environment(kit, backend, dpr, foreground=False):
+    environment = os.environ.copy()
+    environment.update(QSG_RHI_BACKEND=backend, QT_SCALE_FACTOR=str(dpr),
+                       QT_PLUGIN_PATH=str(kit / "plugins"),
+                       YALAHOO_VERIFY_FOREGROUND="1" if foreground else "0",
+                       QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM="1",
+                       YALAHOO_VERIFY_VISIBLE="0",
+                       YALAHOO_VERIFY_WINDOW_LIFECYCLE="0",
+                       QCPAINTER_DEBUG_COLLECT="0",
+                       QSG_RENDER_LOOP="basic" if platform.system() == "Darwin" and backend == "opengl" else "threaded")
+    environment.pop("QSG_NO_VSYNC", None)
+    if platform.system() == "Windows":
+        environment["PATH"] = str(kit / "bin") + os.pathsep + environment.get("PATH", "")
+    return environment
+
+
+def replay_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--backend", choices=BACKEND_IDS, required=True)
+    parser.add_argument("--dpr", type=float, choices=(1, 1.5, 2), default=1)
+    parser.add_argument("--runs", type=int, default=1)
+    parser.add_argument("--foreground", action="store_true")
+    parser.add_argument("--night", action="store_true")
+    parser.add_argument("--output", type=Path, required=True)
+    return parser
+
+
+def run_replays(parser, args, command, validate, **scope):
+    if not 1 <= args.runs <= MAXIMUM_RUNS:
+        parser.error(f"runs must be between 1 and {MAXIMUM_RUNS}")
+    if args.output.exists():
+        parser.error("output already exists; preserve prior results and choose a fresh directory")
+    visual = getattr(args, "visual", False)
+    executable = executable_path(tool="ui-tests" if visual else None)
+    if not executable.is_file():
+        parser.error("Build the qt-release preset first")
+    chain = json.loads((ROOT / "build/release/toolchain.json").read_text(encoding="utf-8"))
+    if chain.get("configuration") != "Release":
+        parser.error("The native replay requires a Release build")
+    args.output.mkdir(parents=True)
+    environment = replay_environment(Path(chain["qtKit"]), args.backend, args.dpr, args.foreground)
+    environment.update(YALAHOO_VERIFY_NIGHT="1" if args.night else "0",
+                       YALAHOO_VERIFY_WINDOW_LIFECYCLE="1" if getattr(args, "window_lifecycle", False) else "0")
+    if visual:
+        environment["YALAHOO_VERIFY_VISIBLE"] = "0"
+    manifest = dict(binarySha256=hashlib.sha256(executable.read_bytes()).hexdigest(),
+                    sourceRevision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+                    workingTreeDiffSha256=hashlib.sha256(subprocess.check_output(["git", "diff"], cwd=ROOT)).hexdigest(),
+                    system=platform.platform(), backend=args.backend, dpr=args.dpr,
+                    foreground=args.foreground, night=args.night,
+                    requestedRuns=args.runs, runs=[], completed=False, passed=False, **scope)
+    manifest_path = args.output / "manifest.json"
+    write_json(manifest_path, manifest)
+    passed = True
+    for index in range(1, args.runs + 1):
+        output = args.output / f"run-{index}"
+        log_path = args.output / f"run-{index}.log"
+        code = run_logged([str(executable), command, str(output.resolve())], log_path,
+                          cwd=ROOT, environment=environment, timeout=REPLAY_TIMEOUT_SECONDS)
+        report_path = output / "report.json"
+        report = read_report(report_path)
+        try:
+            valid = bool(code == 0 and report.get("passed") is True
+                         and report.get("backend") == args.backend and validate(report, args, output)
+                         and not any(token in log_path.read_text(encoding="utf-8") for token in QML_ERRORS))
+        except (OSError, ValueError, TypeError, KeyError, AttributeError):
+            valid = False
+        passed = valid and passed
+        manifest["runs"].append(dict(run=index, exitCode=code, passed=valid, report=str(report_path)))
+        print(f"{args.backend} DPR{args.dpr:g} run {index}: {'passed' if valid else 'FAILED'}", flush=True)
+        write_json(manifest_path, manifest)
+        if not valid:
+            break
+    manifest["completed"] = len(manifest["runs"]) == args.runs
+    manifest["passed"] = passed and manifest["completed"]
+    write_json(manifest_path, manifest)
+    return 0 if manifest["passed"] else 1

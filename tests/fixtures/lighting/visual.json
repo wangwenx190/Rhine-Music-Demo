@@ -1,0 +1,6410 @@
+{
+  "lighting": true,
+  "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
+  "sources": {
+    "src/music-model.ts": "8531d1f1f5f40a7cc619d8b79eb9270b8afb92c154b1c47d2e5e5af5802c571a",
+    "src/music-lighting.ts": "5a8d6110900ce1e1b6c7872db56e2a6030513d8565d5a1f67d4266a2704f276b",
+    "src/music-row-lighting.ts": "1e7ab90893fc151896e862788804f430ffa416150bcef7f04b8388746e491294",
+    "src/theme-transition.ts": "7b59fdda7586195d9e1d26eb38073ecfe645279b197b127bdd61bfa2e0d52344",
+    "src/archive-lighting.ts": "fc14af44039728419a0338770e13774697b6eea20ce61abc59e76b99f0c0d349",
+    "src/cover-atlas.ts": "db618e47e44f9e3a4197e26d297345b3693ce5ff7067608f9966be3bc5b75910",
+    "src/scene.ts": "cd212bd9a40ea2323e21ad3008a025dd5a5874cb5d095f53375986122743d541",
+    "src/music-cd-asset.ts": "eb072d8c9843a24aaf62f2ef0b09bd25a730314e501035b0b2c4492672054b56"
+  },
+  "environment": {
+    "width": 768,
+    "height": 1024,
+    "sha256": "5693c5a0eb2ea0d2d89b1a982818d6b9c8d234c6bfba6fbcdcfcc9b753634d02",
+    "format": "RGBA32F little-endian; original WebGL bottom row first"
+  },
+  "width": 960,
+  "height": 720,
+  "dpr": 1,
+  "fov": 32,
+  "cases": [
+    {
+      "index": 0,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "baseline",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        9
+      ],
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.027
+          ],
+          "pixel": [
+            503.78577554475237,
+            360
+          ]
+        }
+      ],
+      "screenshot": "000.png"
+    },
+    {
+      "index": 1,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "baseline",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        9.62
+      ],
+      "origin": [
+        0,
+        0,
+        0.62
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.647
+          ],
+          "pixel": [
+            503.7857755447525,
+            360
+          ]
+        }
+      ],
+      "screenshot": "001.png"
+    },
+    {
+      "index": 2,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "baseline",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        11.48
+      ],
+      "origin": [
+        0,
+        0,
+        2.48
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            2.507
+          ],
+          "pixel": [
+            503.78577554475237,
+            360
+          ]
+        }
+      ],
+      "screenshot": "002.png"
+    },
+    {
+      "index": 3,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "baseline",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        6
+      ],
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            272.6050015971909,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            764.336596621317,
+            613.0459720297498
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            740.9861780545068,
+            27.845050673554795
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            284.58002103431846,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.027
+          ],
+          "pixel": [
+            494.95506057219535,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "003.png"
+    },
+    {
+      "index": 4,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "baseline",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        6.62
+      ],
+      "origin": [
+        0,
+        0,
+        0.62
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            272.60500159719106,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            764.3365966213172,
+            613.0459720297498
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            740.986178054507,
+            27.845050673554795
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            284.58002103431863,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.647
+          ],
+          "pixel": [
+            494.95506057219546,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "004.png"
+    },
+    {
+      "index": 5,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "baseline",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        8.48
+      ],
+      "origin": [
+        0,
+        0,
+        2.48
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            272.60500159719106,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            764.3365966213171,
+            613.0459720297497
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            740.986178054507,
+            27.845050673554717
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            284.58002103431863,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            2.507
+          ],
+          "pixel": [
+            494.95506057219546,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "005.png"
+    },
+    {
+      "index": 6,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "area",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        9
+      ],
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.027
+          ],
+          "pixel": [
+            503.78577554475237,
+            360
+          ]
+        }
+      ],
+      "screenshot": "006.png"
+    },
+    {
+      "index": 7,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "area",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        9.62
+      ],
+      "origin": [
+        0,
+        0,
+        0.62
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.647
+          ],
+          "pixel": [
+            503.7857755447525,
+            360
+          ]
+        }
+      ],
+      "screenshot": "007.png"
+    },
+    {
+      "index": 8,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "area",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        11.48
+      ],
+      "origin": [
+        0,
+        0,
+        2.48
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            2.507
+          ],
+          "pixel": [
+            503.78577554475237,
+            360
+          ]
+        }
+      ],
+      "screenshot": "008.png"
+    },
+    {
+      "index": 9,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "area",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        6
+      ],
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            272.6050015971909,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            764.336596621317,
+            613.0459720297498
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            740.9861780545068,
+            27.845050673554795
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            284.58002103431846,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.027
+          ],
+          "pixel": [
+            494.95506057219535,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "009.png"
+    },
+    {
+      "index": 10,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "area",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        6.62
+      ],
+      "origin": [
+        0,
+        0,
+        0.62
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            272.60500159719106,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            764.3365966213172,
+            613.0459720297498
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            740.986178054507,
+            27.845050673554795
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            284.58002103431863,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.647
+          ],
+          "pixel": [
+            494.95506057219546,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "010.png"
+    },
+    {
+      "index": 11,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "area",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        8.48
+      ],
+      "origin": [
+        0,
+        0,
+        2.48
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            272.60500159719106,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            764.3365966213171,
+            613.0459720297497
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            740.986178054507,
+            27.845050673554717
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            284.58002103431863,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            2.507
+          ],
+          "pixel": [
+            494.95506057219546,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "011.png"
+    },
+    {
+      "index": 12,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "guided",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        9
+      ],
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.027
+          ],
+          "pixel": [
+            503.78577554475237,
+            360
+          ]
+        }
+      ],
+      "screenshot": "012.png"
+    },
+    {
+      "index": 13,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "guided",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        9.62
+      ],
+      "origin": [
+        0,
+        0,
+        0.62
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.647
+          ],
+          "pixel": [
+            503.7857755447525,
+            360
+          ]
+        }
+      ],
+      "screenshot": "013.png"
+    },
+    {
+      "index": 14,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "guided",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        11.48
+      ],
+      "origin": [
+        0,
+        0,
+        2.48
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            2.507
+          ],
+          "pixel": [
+            503.78577554475237,
+            360
+          ]
+        }
+      ],
+      "screenshot": "014.png"
+    },
+    {
+      "index": 15,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "guided",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        6
+      ],
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            272.6050015971909,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            764.336596621317,
+            613.0459720297498
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            740.9861780545068,
+            27.845050673554795
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            284.58002103431846,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.027
+          ],
+          "pixel": [
+            494.95506057219535,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "015.png"
+    },
+    {
+      "index": 16,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "guided",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        6.62
+      ],
+      "origin": [
+        0,
+        0,
+        0.62
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            272.60500159719106,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            764.3365966213172,
+            613.0459720297498
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            740.986178054507,
+            27.845050673554795
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            284.58002103431863,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.647
+          ],
+          "pixel": [
+            494.95506057219546,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "016.png"
+    },
+    {
+      "index": 17,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "guided",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        8.48
+      ],
+      "origin": [
+        0,
+        0,
+        2.48
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            272.60500159719106,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            764.3365966213171,
+            613.0459720297497
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            740.986178054507,
+            27.845050673554717
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            284.58002103431863,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            2.507
+          ],
+          "pixel": [
+            494.95506057219546,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "017.png"
+    },
+    {
+      "index": 18,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "hybrid",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        9
+      ],
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.027
+          ],
+          "pixel": [
+            503.78577554475237,
+            360
+          ]
+        }
+      ],
+      "screenshot": "018.png"
+    },
+    {
+      "index": 19,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "hybrid",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        9.62
+      ],
+      "origin": [
+        0,
+        0,
+        0.62
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.647
+          ],
+          "pixel": [
+            503.7857755447525,
+            360
+          ]
+        }
+      ],
+      "screenshot": "019.png"
+    },
+    {
+      "index": 20,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "hybrid",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        11.48
+      ],
+      "origin": [
+        0,
+        0,
+        2.48
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            2.507
+          ],
+          "pixel": [
+            503.78577554475237,
+            360
+          ]
+        }
+      ],
+      "screenshot": "020.png"
+    },
+    {
+      "index": 21,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "hybrid",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        6
+      ],
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            272.6050015971909,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            764.336596621317,
+            613.0459720297498
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            740.9861780545068,
+            27.845050673554795
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            284.58002103431846,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.027
+          ],
+          "pixel": [
+            494.95506057219535,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "021.png"
+    },
+    {
+      "index": 22,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "hybrid",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        6.62
+      ],
+      "origin": [
+        0,
+        0,
+        0.62
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            272.60500159719106,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            764.3365966213172,
+            613.0459720297498
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            740.986178054507,
+            27.845050673554795
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            284.58002103431863,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.647
+          ],
+          "pixel": [
+            494.95506057219546,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "022.png"
+    },
+    {
+      "index": 23,
+      "width": 960,
+      "height": 720,
+      "day": true,
+      "mode": "hybrid",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        8.48
+      ],
+      "origin": [
+        0,
+        0,
+        2.48
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            1,
+            0.982250550332711,
+            0.9386857284565036
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.94,
+          "roughness": 0.4,
+          "thickness": 0.022,
+          "attenuationDistance": 3.8
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.7991027380100881,
+            0.7529422167708612,
+            0.6866853124288864
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.84,
+          "roughness": 0.3,
+          "thickness": 0.08,
+          "attenuationDistance": 3.2
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.8387990117372213,
+            0.7912979403281551,
+            0.7156935005005721
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.7,
+          "roughness": 0.46,
+          "thickness": 0.05,
+          "attenuationDistance": 2
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            272.60500159719106,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            764.3365966213171,
+            613.0459720297497
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            740.986178054507,
+            27.845050673554717
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            284.58002103431863,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            2.507
+          ],
+          "pixel": [
+            494.95506057219546,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "023.png"
+    },
+    {
+      "index": 24,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "baseline",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        9
+      ],
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.027
+          ],
+          "pixel": [
+            503.78577554475237,
+            360
+          ]
+        }
+      ],
+      "screenshot": "024.png"
+    },
+    {
+      "index": 25,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "baseline",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        9.62
+      ],
+      "origin": [
+        0,
+        0,
+        0.62
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.647
+          ],
+          "pixel": [
+            503.7857755447525,
+            360
+          ]
+        }
+      ],
+      "screenshot": "025.png"
+    },
+    {
+      "index": 26,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "baseline",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        11.48
+      ],
+      "origin": [
+        0,
+        0,
+        2.48
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            2.507
+          ],
+          "pixel": [
+            503.78577554475237,
+            360
+          ]
+        }
+      ],
+      "screenshot": "026.png"
+    },
+    {
+      "index": 27,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "baseline",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        6
+      ],
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            272.6050015971909,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            764.336596621317,
+            613.0459720297498
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            740.9861780545068,
+            27.845050673554795
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            284.58002103431846,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.027
+          ],
+          "pixel": [
+            494.95506057219535,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "027.png"
+    },
+    {
+      "index": 28,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "baseline",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        6.62
+      ],
+      "origin": [
+        0,
+        0,
+        0.62
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            272.60500159719106,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            764.3365966213172,
+            613.0459720297498
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            740.986178054507,
+            27.845050673554795
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            284.58002103431863,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.647
+          ],
+          "pixel": [
+            494.95506057219546,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "028.png"
+    },
+    {
+      "index": 29,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "baseline",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        8.48
+      ],
+      "origin": [
+        0,
+        0,
+        2.48
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            272.60500159719106,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            764.3365966213171,
+            613.0459720297497
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            740.986178054507,
+            27.845050673554717
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            284.58002103431863,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            2.507
+          ],
+          "pixel": [
+            494.95506057219546,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "029.png"
+    },
+    {
+      "index": 30,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "area",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        9
+      ],
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.027
+          ],
+          "pixel": [
+            503.78577554475237,
+            360
+          ]
+        }
+      ],
+      "screenshot": "030.png"
+    },
+    {
+      "index": 31,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "area",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        9.62
+      ],
+      "origin": [
+        0,
+        0,
+        0.62
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.647
+          ],
+          "pixel": [
+            503.7857755447525,
+            360
+          ]
+        }
+      ],
+      "screenshot": "031.png"
+    },
+    {
+      "index": 32,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "area",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        11.48
+      ],
+      "origin": [
+        0,
+        0,
+        2.48
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            2.507
+          ],
+          "pixel": [
+            503.78577554475237,
+            360
+          ]
+        }
+      ],
+      "screenshot": "032.png"
+    },
+    {
+      "index": 33,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "area",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        6
+      ],
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            272.6050015971909,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            764.336596621317,
+            613.0459720297498
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            740.9861780545068,
+            27.845050673554795
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            284.58002103431846,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.027
+          ],
+          "pixel": [
+            494.95506057219535,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "033.png"
+    },
+    {
+      "index": 34,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "area",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        6.62
+      ],
+      "origin": [
+        0,
+        0,
+        0.62
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            272.60500159719106,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            764.3365966213172,
+            613.0459720297498
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            740.986178054507,
+            27.845050673554795
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            284.58002103431863,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.647
+          ],
+          "pixel": [
+            494.95506057219546,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "034.png"
+    },
+    {
+      "index": 35,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "area",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        8.48
+      ],
+      "origin": [
+        0,
+        0,
+        2.48
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            272.60500159719106,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            764.3365966213171,
+            613.0459720297497
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            740.986178054507,
+            27.845050673554717
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            284.58002103431863,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            2.507
+          ],
+          "pixel": [
+            494.95506057219546,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "035.png"
+    },
+    {
+      "index": 36,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "guided",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        9
+      ],
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.027
+          ],
+          "pixel": [
+            503.78577554475237,
+            360
+          ]
+        }
+      ],
+      "screenshot": "036.png"
+    },
+    {
+      "index": 37,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "guided",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        9.62
+      ],
+      "origin": [
+        0,
+        0,
+        0.62
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.647
+          ],
+          "pixel": [
+            503.7857755447525,
+            360
+          ]
+        }
+      ],
+      "screenshot": "037.png"
+    },
+    {
+      "index": 38,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "guided",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        11.48
+      ],
+      "origin": [
+        0,
+        0,
+        2.48
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            2.507
+          ],
+          "pixel": [
+            503.78577554475237,
+            360
+          ]
+        }
+      ],
+      "screenshot": "038.png"
+    },
+    {
+      "index": 39,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "guided",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        6
+      ],
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            272.6050015971909,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            764.336596621317,
+            613.0459720297498
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            740.9861780545068,
+            27.845050673554795
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            284.58002103431846,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.027
+          ],
+          "pixel": [
+            494.95506057219535,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "039.png"
+    },
+    {
+      "index": 40,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "guided",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        6.62
+      ],
+      "origin": [
+        0,
+        0,
+        0.62
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            272.60500159719106,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            764.3365966213172,
+            613.0459720297498
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            740.986178054507,
+            27.845050673554795
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            284.58002103431863,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.647
+          ],
+          "pixel": [
+            494.95506057219546,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "040.png"
+    },
+    {
+      "index": 41,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "guided",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        8.48
+      ],
+      "origin": [
+        0,
+        0,
+        2.48
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            272.60500159719106,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            764.3365966213171,
+            613.0459720297497
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            740.986178054507,
+            27.845050673554717
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            284.58002103431863,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            2.507
+          ],
+          "pixel": [
+            494.95506057219546,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "041.png"
+    },
+    {
+      "index": 42,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "hybrid",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        9
+      ],
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.027
+          ],
+          "pixel": [
+            503.78577554475237,
+            360
+          ]
+        }
+      ],
+      "screenshot": "042.png"
+    },
+    {
+      "index": 43,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "hybrid",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        9.62
+      ],
+      "origin": [
+        0,
+        0,
+        0.62
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.647
+          ],
+          "pixel": [
+            503.7857755447525,
+            360
+          ]
+        }
+      ],
+      "screenshot": "043.png"
+    },
+    {
+      "index": 44,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "hybrid",
+      "angle": "front",
+      "position": [
+        0,
+        1.85,
+        11.48
+      ],
+      "origin": [
+        0,
+        0,
+        2.48
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            167.18712547406844,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            792.8128745259316,
+            595.4883437442405
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            792.8128745259316,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            167.18712547406844,
+            124.51165625575949
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            2.507
+          ],
+          "pixel": [
+            503.78577554475237,
+            360
+          ]
+        }
+      ],
+      "screenshot": "044.png"
+    },
+    {
+      "index": 45,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "hybrid",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        6
+      ],
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            272.6050015971909,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.07
+          ],
+          "pixel": [
+            764.336596621317,
+            613.0459720297498
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            740.9861780545068,
+            27.845050673554795
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.07
+          ],
+          "pixel": [
+            284.58002103431846,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.027
+          ],
+          "pixel": [
+            494.95506057219535,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "045.png"
+    },
+    {
+      "index": 46,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "hybrid",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        6.62
+      ],
+      "origin": [
+        0,
+        0,
+        0.62
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            272.60500159719106,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            0.69
+          ],
+          "pixel": [
+            764.3365966213172,
+            613.0459720297498
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            740.986178054507,
+            27.845050673554795
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            0.69
+          ],
+          "pixel": [
+            284.58002103431863,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            0.647
+          ],
+          "pixel": [
+            494.95506057219546,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "046.png"
+    },
+    {
+      "index": 47,
+      "width": 960,
+      "height": 720,
+      "day": false,
+      "mode": "hybrid",
+      "angle": "low",
+      "position": [
+        6,
+        0.3,
+        8.48
+      ],
+      "origin": [
+        0,
+        0,
+        2.48
+      ],
+      "cover": "square",
+      "layer": "all",
+      "clarity": 0,
+      "detail": 0,
+      "parameters": [
+        {
+          "surface": "Frosted_Polymer",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.96,
+          "roughness": 0.34,
+          "thickness": 0.018,
+          "attenuationDistance": 5
+        },
+        {
+          "surface": "Ivory_Edges",
+          "color": [
+            0.9215818562755338,
+            0.9646862478936612,
+            1
+          ],
+          "attenuation": [
+            0.7156935005005721,
+            0.8227857543924378,
+            0.982250550332711
+          ],
+          "transmission": 0.88,
+          "roughness": 0.25,
+          "thickness": 0.06,
+          "attenuationDistance": 4.5
+        },
+        {
+          "surface": "Optical_Diffuser",
+          "color": [
+            0.5647115056965487,
+            0.6724431569510133,
+            0.7835377915215659
+          ],
+          "attenuation": [
+            0.8962693533719567,
+            0.8148465722120952,
+            0.7083757798856457
+          ],
+          "transmission": 0.8,
+          "roughness": 0.38,
+          "thickness": 0.038,
+          "attenuationDistance": 4.5
+        }
+      ],
+      "projections": [
+        {
+          "world": [
+            -2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            272.60500159719106,
+            605.5749497049552
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            0.175,
+            2.55
+          ],
+          "pixel": [
+            764.3365966213171,
+            613.0459720297497
+          ]
+        },
+        {
+          "world": [
+            2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            740.986178054507,
+            27.845050673554717
+          ]
+        },
+        {
+          "world": [
+            -2.225,
+            3.525,
+            2.55
+          ],
+          "pixel": [
+            284.58002103431863,
+            194.55256284003136
+          ]
+        },
+        {
+          "world": [
+            0.17,
+            1.85,
+            2.507
+          ],
+          "pixel": [
+            494.95506057219546,
+            356.2978304966573
+          ]
+        }
+      ],
+      "screenshot": "047.png"
+    }
+  ]
+}

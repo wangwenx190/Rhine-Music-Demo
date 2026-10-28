@@ -1,0 +1,79 @@
+{
+  "license": "resources/licenses/three-LICENSE; resources/licenses/materials-NOTICE.md",
+  "shaders": [
+    {
+      "sha256": "56179300428d8c7181c421de826141c0853bdf52d56458647e3948b5e7b7534b",
+      "path": "resources/shaders/rhi/frame.glsl"
+    },
+    {
+      "sha256": "3cca931c3044ac3d015247372bebb9610b7b78825aee57fd9c90dd6a88d44817",
+      "path": "resources/shaders/rhi/geometry.vert"
+    },
+    {
+      "sha256": "d779d49c2c72404aab6a1b7cec95a6ba8c07d99401cd02f24c476df1259e8948",
+      "path": "resources/shaders/rhi/opaque.frag"
+    },
+    {
+      "sha256": "5f206ae225c0d975962241ded0fe367c1755c1b9f035bba94fa68a399f804cd8",
+      "path": "resources/shaders/rhi/output.frag"
+    },
+    {
+      "sha256": "fab1bd7f5921bc1fb75d96e6b9e932d5da82edb1a89b33b4af6fdd9f325b0376",
+      "path": "resources/shaders/rhi/output.vert"
+    },
+    {
+      "sha256": "e4e285cc9f53e4cc8b76b86f93a2843431a925dbdc018a19b381a5b23b436a05",
+      "path": "resources/shaders/rhi/paper-lighting.glsl"
+    },
+    {
+      "sha256": "7051be9ad7c8bbc13bc7f2d436a5eb4719848c15c56dc3067504a978b424dad2",
+      "path": "resources/shaders/rhi/shadow.frag"
+    },
+    {
+      "sha256": "a83c10dac7eb512b07a6f9c2a87cee7b954f486045cc225aca8c39d34474c63f",
+      "path": "resources/shaders/rhi/shadow.vert"
+    }
+  ],
+  "geometry": "Source GLB; identity transforms; no axis conversion",
+  "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
+  "sharedMath": "prepare-rhi-shaders.ps1 adapts R07 uniforms only",
+  "filter": "Frozen PCFSoftShadowMap runtime alias to PCFShadowMap: 5 Vogel samples + bilinear depth comparison",
+  "sources": [
+    {
+      "source": "resources/models/music-case-v040.glb",
+      "sha256": "7bbee4f485c58e0506e4ab53711c250a1e68bcd38f2a2ea81e6e68b4574b8a16"
+    },
+    {
+      "source": "resources/environment/room-pmrem.rgba32f",
+      "sha256": "5693c5a0eb2ea0d2d89b1a982818d6b9c8d234c6bfba6fbcdcfcc9b753634d02"
+    },
+    {
+      "source": "resources/shaders/album-paper.frag",
+      "sha256": "1619de8d0926f82e99c985b5e35b4d581c1bd59fad4310e2579e1c2cd3dbf344"
+    },
+    {
+      "source": "resources/shaders/album-paper.vert",
+      "sha256": "c56cfc7a6901265b879ac016a1f9890f52f0b3fbfc5b9ae5c25d661b225c4d7e"
+    },
+    {
+      "source": "upstream:src/scene.ts",
+      "sha256": "cd212bd9a40ea2323e21ad3008a025dd5a5874cb5d095f53375986122743d541"
+    },
+    {
+      "source": "upstream:src/music-model.ts",
+      "sha256": "8531d1f1f5f40a7cc619d8b79eb9270b8afb92c154b1c47d2e5e5af5802c571a"
+    },
+    {
+      "source": "upstream:package-lock.json",
+      "sha256": "8a6e407ebfb21ee023310aeb226070f9b7ecfdc014c6120ee7c961cc2aeec904"
+    },
+    {
+      "source": "upstream:node_modules/three/src/renderers/webgl/WebGLShadowMap.js",
+      "sha256": "7d69ca09821ed119d7e1db25e88ad43c2b8c7dd87e8746e1c63f8b86086b3e05"
+    },
+    {
+      "source": "upstream:node_modules/three/src/renderers/shaders/ShaderChunk/shadowmap_pars_fragment.glsl.js",
+      "sha256": "18e692b928e27a636cd68ec43121728c11df6914063ab215892861a8a437bf88"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+# macOS开发与部署操作
+
+本文只管macOS工具、应用入口与系统差异。Kit/C++23规则见[native-bootstrap.md](../contracts/native-bootstrap.md)，测试范围与复用见[test-gates.md](../contracts/test-gates.md)，未完成实机门槛集中于迁移计划R31-P、R36。
+
+## 开发环境与构建
+
+- Apple Silicon使用原生arm64终端；Universal Kit须包含本机架构。安装支持项目C++23探针的Xcode/Command Line Tools、CMake/Ninja、现代clang-format及本机最新完整Qt Desktop Kit。构建每次重新发现最新原生Kit，不固定版本，不因缺模块回退。
+- 自定义Qt根使用本机`YALAHOO_QT_ROOTS`；formatter可在本机cache设置`YALAHOO_CLANG_FORMAT`。不要复制其他机器的build/cache/UserPresets/Kit/私人数据；冻结来源解析需要完整Git历史。
+- `sh tools/build/macos.sh -DYALAHOO_REVIEW=OFF`配置并构建普通Release，产物为`build/release/bin/yalahoo.app`。脚本保留后续CMake参数；测试按受影响项显式选择，格式入口见code-style契约。
+- 需要隐藏组件验证时用`sh tools/build/macos.sh -DYALAHOO_REVIEW=ON -DYALAHOO_MACOS_VISIBLE_TESTS=OFF`，再按组件契约选择CTest。`macos-application-menu`检查真实AppKit菜单动作、Qt编辑对象与释放；`verification-window-policy`检查默认隐藏策略。
+
+## 独立生产部署
+
+```sh
+sh tools/deploy/macos.sh
+python3 tools/deploy/verify-macos.py --output "$PWD/verification/macos-clean"
+./yalahoo.command --demo
+```
+
+部署入口使用独立`build/macos-release/`，强制Release、Review OFF；不改开发构建的Review开关。它校验选中Kit的qtpaths，调用同Kit macdeployqt，只扫描编入应用的生产QML。`out/macos/yalahoo.app`包含Frameworks、PlugIns、Resources/qml、原始ICNS及qrc资源，署名/资源/字体/音频/安装Qt许可在Resources/licenses中。Qt随附媒体依赖由macdeployqt处理，应用不调用外部FFmpeg。递归QtQuick部署带入的SQL驱动仅保留自含SQLite；产品使用JSON存储，没有外部数据库服务。
+
+打包逐个核对实际Mach-O架构、加载依赖与rpath、QML/插件/CanvasPainter闭包、包内符号链接和本地签名；Info.plist与package.json的最低macOS版本取实际全部二进制切片要求的最大值，不从Qt版本猜测兼容系统。macdeployqt重写包内加载依赖后，去除重定位后越出bundle的Kit搜索路径，实际依赖仍须全部解析。对暂存bundle中的每个Mach-O执行`strip -S -x`，保留动态导出/运行符号，然后统一重新ad-hoc签名；文件清单和加载检查消费最终签名产物，不修改构建bundle或开发Kit。构建、部署、签名、闭包或隐藏产品探针失败均保留既有包。该包仅作本地ad-hoc签名，不自动上传、公证或发布。
+
+验证器校验package.json中的文件hash/可执行位/符号链接，再以系统PATH、清除Qt/QML/DYLD覆盖的子环境，从包外新目录运行`--verify-deployment`。产品保持隐藏，实例化真实App QML、核对嵌入字体/图标/shader/音频加载及QML warnings，并经真实Qt后端无声加载BGM；实际dyld映像只能来自bundle或系统。输出写入指定全新目录，省略时使用系统临时目录；不能放在部署包内。此入口不发play、不证明GPU画面或实际听感。Python仅用于开发验证，普通应用运行不需要它。
+
+复制整个`out/macos/`到含空格/中文的其他目录后，可在该目录运行`python3 verify-macos.py --output /绝对路径/全新目录`复核重定位；应用本身可直接双击bundle。不要移动或改写bundle内部文件。
+
+## 普通启动、菜单与后台
+
+根`yalahoo.command`及`yalahoo.sh`优先运行完整部署包；无包时使用Release开发bundle和cache中的Kit。`tools/launchers/demo.command`与`lighting-lab.command`同样复用原生入口。路径按脚本自身位置解析，参数和进程退出码保留；启动器不自动构建。
+
+- 应用菜单：⌘,打开现有设置，片头输入锁期间禁用；⌘Q正常退出。
+- 文件/窗口：⌘W关闭最后窗口并退出；⌘M最小化，窗口菜单提供缩放。隐藏⌘H、隐藏其他⌥⌘H与全部显示由系统处理。
+- 编辑菜单：⌘Z、⇧⌘Z、⌘X/C/V/A调用当前Qt编辑器的撤销、重做、剪切、复制、粘贴、全选；能力随焦点、只读、选区与剪贴板状态变化。菜单不持有可重建的QML编辑对象。
+- 隐藏/最小化停止视觉帧与新封面工作，歌曲/BGM由独立Qt媒体会话继续；关闭/退出依次停止歌曲、BGM、音效。普通产品保持正常窗口行为；默认原生数据根由QStandardPaths/AppLocalDataLocation和稳定技术身份决定。
+
+原生strip/重定位最小检查：`python3 tests/tools/UnixDeploymentTest.py`；动态导出、去除开发路径和包外执行须在对应原生平台通过。
+
+## 实机操作入口
+
+使用匿名或用户明确选择的歌曲，普通启动可传`--data-dir /绝对/隔离目录 --music-root /绝对/匿名音乐目录`。目标待办与退出事实唯一见迁移计划R36；矩阵、质量与物理DPR选择见[test-gates.md](../contracts/test-gates.md)。
+
+macOS特有操作为Finder图标/名称、上述物理Command菜单、输入法/系统目录对话框、Retina/跨屏通知及EDR亮度/电源变化；媒体设备/听感与同窗口恢复按所属契约在同一产品会话检查。记录实际屏幕DPR，不要求精确DPR1/1.5/2三套物理设备。包外隐藏加载、Qt事件输入和受控target均不能替代这些事实。
+
+## 图形与验证差异
+
+默认Metal/threaded。可用`QSG_RHI_BACKEND=vulkan ./yalahoo.command --demo`显式请求Vulkan；需要启用Vulkan的Qt Kit、SDK开发头和MoltenVK运行时，未编译该特性的Qt须使用同版本且启用该特性的原生构建，不能只安装运行库。选择与失败语义见[后端契约](../contracts/render-backend.md)。显式OpenGL在QGuiApplication前选择4.1/CoreProfile，native drawable用basic主线程；缺多采样纹理入口时保持同格式/样本renderbuffer+resolve，动态执行集中于R36。两种线程模式的成本分开。
+
+普通验证遵守[test-window-policy.md](../contracts/test-window-policy.md)，macOS可见测试默认OFF，RenderControl真正隐藏。原生工具需有WindowServer/系统服务访问；受限进程中的无屏幕或不可用系统服务不算运行通过。前台授权不跨轮次；不能为遮挡/节流提升窗口。
+
+实际DPR从窗口/组件报告核对；CoreText与彩色字体适配见assets/title-reels。CanvasPainter在产品使用C++ API，运行报告按verification-artifacts.md保留本地；欠验只由迁移计划管理。

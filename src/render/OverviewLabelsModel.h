@@ -1,0 +1,69 @@
+// Admits and animates a bounded set of projected column labels. Collision hysteresis and
+// retiring slots preserve stable identities through entry/exit overlap.
+
+#pragma once
+#include <QAbstractListModel>
+#include <memory>
+#include <span>
+
+namespace yalahoo {
+namespace overviewLabelTiming {
+// Card exits may complete before their independently animated entry buttons.
+inline constexpr auto EnterMilliseconds = 460;
+inline constexpr auto ExitMilliseconds = 240;
+}
+
+struct OverviewColumn final
+{
+    int lane = -1;
+    QString name;
+    int count = 0;
+    double x = 0, y = 0, extent = 1;
+    bool selected = false;
+};
+class OverviewLabelsModel : public QAbstractListModel
+{
+    Q_OBJECT
+    Q_DISABLE_COPY_MOVE(OverviewLabelsModel)
+public:
+    static constexpr int capacity = 18; // Nine current and at most nine retiring anchors.
+    enum Role {
+        Lane = Qt::UserRole + 1,
+        Name,
+        Count,
+        X,
+        Y,
+        Extent,
+        Selected,
+        Interactive,
+        Expanded,
+        Fade,
+        Offset,
+        EntryWidth,
+        EntryOpacity,
+        EntryOffset
+    };
+    explicit OverviewLabelsModel(QObject *parent = nullptr);
+    ~OverviewLabelsModel() override;
+    int rowCount(const QModelIndex &parent = { }) const override;
+    QVariant data(const QModelIndex &index, int role) const override;
+    QHash<int, QByteArray> roleNames() const override;
+    static QVector<OverviewColumn> visibleLabels(const QVector<OverviewColumn> &columns,
+                                                 double width, double height,
+                                                 std::span<const int> retained = { },
+                                                 int expanded = -1);
+    void update(const QVector<OverviewColumn> &columns, double width, double height, bool ready,
+                double dt, bool reduced);
+    bool expand(int lane);
+    void collapse();
+    bool canEnter(int lane) const;
+    int expandedLane() const;
+    void clear();
+    int liveCount() const;
+    bool running() const;
+
+private:
+    struct Private;
+    std::unique_ptr<Private> d;
+};
+}

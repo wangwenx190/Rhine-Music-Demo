@@ -1,0 +1,181 @@
+#!/usr/bin/env python3
+"""Run explicit product diagnostics and presentation sampling."""
+from native_replay import (BACKEND_IDS, QML_ERRORS, cmake_cache, executable_path, read_report,
+                           finite_number, matching_number, replay_environment, run_logged, write_json)
+import argparse
+import hashlib
+from pathlib import Path
+import platform
+
+ROOT = Path(__file__).resolve().parents[2]
+SCENARIOS = [f"{theme}-{action}" for theme in ("day", "night")
+             for action in ("wave", "ruler", "detail", "switch", "overview", "search")]
+
+
+def parse_arguments(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--backend", required=True, choices=BACKEND_IDS)
+    parser.add_argument("--mode", choices=("offscreen", "vsync", "uncapped"), default="offscreen")
+    parser.add_argument("--scenario", choices=["matrix", *SCENARIOS])
+    scope = parser.add_mutually_exclusive_group()
+    scope.add_argument("--formal", action="store_true", help="One 120-second normal VSYNC acceptance sample")
+    scope.add_argument("--observe-only", action="store_true",
+                       help="Observe one native wave scenario without functional replay or large input generation")
+    parser.add_argument("--seconds", type=int)
+    parser.add_argument("--runs", type=int, choices=(1, 3),
+                        help="One run by default; three only for an explicit comparison or fixed recheck")
+    parser.add_argument("--dpr", type=float, choices=(1, 1.5, 2), default=1)
+    parser.add_argument("--foreground", action="store_true")
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args(argv)
+    if args.seconds is None:
+        args.seconds = 120 if args.formal else 30
+    if args.runs is None:
+        args.runs = 1
+    if not 12 <= args.seconds <= 120:
+        parser.error("seconds must be 12..120")
+    if args.formal and (args.seconds != 120 or args.mode != "vsync" or args.dpr != 1):
+        parser.error("Formal acceptance requires normal VSYNC, DPR 1 and 120 seconds")
+    if args.scenario is None:
+        if args.mode == "offscreen":
+            args.scenario = "matrix"
+        else:
+            parser.error("Native sampling requires --scenario with one fixed day/night scenario")
+    if args.mode != "offscreen" and args.scenario == "matrix":
+        parser.error("Choose one fixed scenario for native sampling")
+    if args.observe_only and (args.mode == "offscreen" or args.scenario not in ("day-wave", "night-wave")
+                              or args.runs != 1):
+        parser.error("Observation requires one native day-wave/night-wave run")
+    if args.mode == "offscreen":
+        if platform.system() != "Darwin":
+            parser.error("The genuine hidden RenderControl entry is currently implemented on macOS only")
+        if args.foreground:
+            parser.error("Offscreen runs have no foreground window")
+    if args.output.exists():
+        parser.error("Choose a fresh output directory; preserve failed and raw runs")
+    return args
+
+
+def validate_report(report, args, exit_code):
+    if not isinstance(report, dict):
+        return False
+    if any(type(report.get(field)) is not int for field in
+           ("backend", "samplingRequestedSeconds", "switches", "rebuilds")):
+        return False
+    dpr = report.get("dpr")
+    if not matching_number(dpr, args.dpr):
+        return False
+    expected_switches, expected_rebuilds = (0, 0) if args.observe_only else (3, 2)
+    valid = (exit_code == 0 and report.get("functionalPassed") is True
+             and report.get("samplingComplete") is True
+             and report.get("backend") == BACKEND_IDS[args.backend]
+             and report.get("scenario") == args.scenario
+             and report.get("samplingRequestedSeconds") == args.seconds
+             and report.get("observationOnly", False) is args.observe_only
+             and report.get("switches") == expected_switches
+             and report.get("rebuilds") == expected_rebuilds)
+    if args.seconds:
+        seconds = report.get("samplingSeconds")
+        stages = report.get("stages")
+        valid = (valid and finite_number(seconds)
+                 and seconds >= args.seconds and isinstance(stages, dict) and bool(stages))
+    if args.mode != "offscreen":
+        valid = (valid and type(report.get("swapIntervalRequested")) is int
+                 and report.get("swapIntervalRequested") == (0 if args.mode == "uncapped" else 1)
+                 and report.get("qsgNoVsyncRequested") is (args.mode == "uncapped"))
+        if args.seconds:
+            valid = valid and report.get("nativeSamplingValid") is True
+    if args.formal:
+        valid = (valid and report.get("performanceGateEnforced") is True
+                 and report.get("performanceGatePassed") is True)
+    if args.observe_only:
+        policy = report.get("windowPolicy")
+        if not isinstance(policy, dict):
+            return False
+        start, end = report.get("samplingStartedNs"), report.get("samplingEndedNs")
+        if type(start) is not int or type(end) is not int or start <= 0 or end <= start:
+            return False
+        frames = report.get("guiFrames")
+        if not isinstance(frames, list) or not all(isinstance(frame, dict) for frame in frames):
+            return False
+        streams = [[frame.get("atNs") for frame in frames],
+                   report.get("synchronizationTimestampsNs", []),
+                   report.get("qtPresentationTimestampsNs", [])]
+        if not all(isinstance(stream, list) and all(type(stamp) is int for stamp in stream)
+                   for stream in streams):
+            return False
+        during_sampling = [[stamp for stamp in stream if start <= stamp <= end] for stream in streams]
+        valid = (valid and policy.get("passed") is True
+                 and report.get("performanceGateEnforced") is False
+                 and report.get("continuouslyExposedDuringSampling") is True
+                 and all(len(stream) >= 2 and all(a < b for a, b in zip(stream, stream[1:]))
+                         for stream in during_sampling))
+    return bool(valid)
+
+
+def main(argv=None):
+    args = parse_arguments(argv)
+    cache = cmake_cache(ROOT)
+    kit = Path(cache["YALAHOO_SELECTED_QT:PATH"])
+    executable = executable_path(ROOT, tool="ui-tests")
+    if cache.get("CMAKE_BUILD_TYPE:STRING") != "Release" or not executable.is_file():
+        raise SystemExit("Build the latest native Kit qt-release ui-tests first")
+    args.output.mkdir(parents=True)
+    environment = replay_environment(kit, args.backend, args.dpr, args.foreground)
+    environment["YALAHOO_VERIFY_VISIBLE"] = "0" if args.mode == "offscreen" else "1"
+    if args.mode == "uncapped":
+        environment["QSG_NO_VSYNC"] = "1"
+    source_files = [*ROOT.glob("src/**/*.cpp"), *ROOT.glob("src/**/*.h"), *ROOT.glob("qml/**/*.qml"),
+                    *ROOT.glob("resources/shaders/**/*"), ROOT / "tests/render/StartupChecks.cpp",
+                    ROOT / "tests/support/OffscreenSurface.h", Path(__file__).resolve()]
+    manifest = dict(system=platform.platform(), compiler=cache.get("CMAKE_CXX_COMPILER:FILEPATH"),
+                    binarySha256=hashlib.sha256(executable.read_bytes()).hexdigest(),
+                    sourceSha256={str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
+                                  for p in sorted(source_files) if p.is_file()},
+                    fixture=("StartupChecks::fixture: 576 albums with embedded qrc covers, no audio or generated large covers"
+                             if args.observe_only else
+                             "StartupChecks::fixture: generated 576 albums/96 distinct 2048-square JPEGs; test::wave(600000), no private library"),
+                    backend=args.backend, dpr=args.dpr, mode=args.mode, scenario=args.scenario, seconds=args.seconds,
+                    formalRequested=args.formal, observationOnly=args.observe_only,
+                    formalAcceptancePassed=None,
+                    foreground=args.foreground, requestedRuns=args.runs,
+                    runs=[], completed=False, passed=False)
+    manifest_path = args.output / "manifest.json"
+
+    def save():
+        write_json(manifest_path, manifest)
+
+    save()
+    passed = True
+    for index in range(1, args.runs + 1):
+        output = args.output / f"run-{index}"
+        command = [str(executable), "--startup", str(output.resolve()), str(args.seconds), args.scenario]
+        if args.observe_only:
+            command.append("observe")
+        log_path = args.output / f"run-{index}.log"
+        code = run_logged(command, log_path, cwd=ROOT,
+                          environment=environment, timeout=1200)
+        report_path = output / "report.json"
+        report = read_report(report_path)
+        try:
+            valid = (validate_report(report, args, code)
+                     and not any(token in log_path.read_text(encoding="utf-8") for token in QML_ERRORS))
+        except (ValueError, TypeError, KeyError, AttributeError):
+            report = {}
+            valid = False
+        manifest["runs"].append(dict(index=index, exitCode=code, passed=valid, report=str(report_path),
+                                      scope=report.get("measurementScope")))
+        passed = passed and valid
+        save()
+        print(f"{args.backend} {args.mode} run {index}: {'passed' if valid else 'FAILED'}", flush=True)
+        # A declared formal/recheck batch retains every run, including failures.
+    manifest["completed"] = len(manifest["runs"]) == args.runs
+    manifest["passed"] = passed and manifest["completed"]
+    if args.formal:
+        manifest["formalAcceptancePassed"] = manifest["passed"]
+    save()
+    return 0 if manifest["passed"] else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""Build and atomically package the selected native Qt macOS Release product."""
+import argparse
+import json
+from pathlib import Path
+import platform
+import shutil
+import subprocess
+import tempfile
+from macos_bundle import inspect_bundle, inventory, normalize_bundle, run, strip_bundle
+from qml_closure import production_qml
+from package_support import copy_licenses, digest, install_package, isolated_environment
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def main():
+    argparse.ArgumentParser(description=__doc__).parse_args()
+    if platform.system() != 'Darwin':
+        raise SystemExit('macOS deployment requires native macOS and its latest complete Qt Kit.')
+    build = ROOT / 'build/macos-release'
+    output = ROOT / 'out/macos'
+    subprocess.run(['cmake', '--preset', 'qt-release', '-B', str(build),
+                    '-DYALAHOO_REVIEW=OFF', '-DYALAHOO_MACOS_VISIBLE_TESTS=OFF'], cwd=ROOT, check=True)
+    subprocess.run(['cmake', '--build', str(build), '--target', 'Yalahoo'], check=True)
+    metadata = json.loads((build / 'deployment.json').read_text())
+    if metadata['configuration'] != 'Release' or metadata['review'] or metadata['system'] != 'Darwin':
+        raise RuntimeError('Only the native production Release bundle may be packaged')
+    kit = Path(metadata['qtKit'])
+    qtpaths = kit / 'bin/qtpaths'
+    deploy = kit / 'bin/macdeployqt'
+    if run(qtpaths, '--query', 'QT_VERSION') != metadata['qtVersion'] or not deploy.is_file():
+        raise RuntimeError('Deployment tools must belong to the selected Qt Kit')
+    qml = [str(path.relative_to(ROOT / 'qml'))
+           for path in production_qml(ROOT, build, metadata)]
+    environment = isolated_environment('DYLD_')
+    environment['PATH'] = str(kit / 'bin') + ':/usr/bin:/bin:/usr/sbin:/sbin'
+    (ROOT / 'out').mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='macos-staging-', dir=ROOT / 'out') as temporary:
+        staging = Path(temporary)
+        bundle = staging / 'yalahoo.app'
+        source = Path(metadata['executable']).parents[2]
+        shutil.copytree(source, bundle, symlinks=True)
+        with tempfile.TemporaryDirectory(prefix='deploy-qml-', dir=build) as scan:
+            for relative in qml:
+                path = Path(relative)
+                destination = Path(scan) / path
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / 'qml' / path, destination)
+            # The selected macdeployqt resolves frameworks/plugins and bundled media dependencies.
+            subprocess.run([str(deploy), str(bundle), '-qmldir=' + scan,
+                            '-qmlimport=' + str(kit / 'qml'), '-verbose=2', '-no-codesign', '-no-strip'],
+                           env=environment, check=True)
+        # macdeployqt recursively copies QtQuick's optional LocalStorage module,
+        # then every SQL driver. The product uses JSON stores, no external SQL
+        # service; retain Qt's self-contained SQLite backend only.
+        sql_plugins = bundle / 'Contents/PlugIns/sqldrivers'
+        if sql_plugins.is_dir():
+            for plugin in sql_plugins.glob('*.dylib'):
+                if plugin.name != 'libqsqlite.dylib':
+                    plugin.unlink()
+        resources = bundle / 'Contents/Resources'
+        # Qt's macOS prefix is Contents; every override remains relative to it.
+        (resources / 'qt.conf').write_text('[Paths]\nPlugins=PlugIns\nQmlImports=Resources/qml\n')
+        copy_licenses(ROOT, kit, resources / 'licenses')
+        normalization = normalize_bundle(bundle)
+        strip_bundle(bundle)
+        subprocess.run(['/usr/bin/codesign', '--force', '--deep', '--sign', '-', str(bundle)], check=True)
+        closure = inspect_bundle(bundle)
+        closure.update(normalization)
+        (build / 'deployment-dependencies.json').write_text(json.dumps(closure, indent=2) + '\n')
+        for name in ('verify-macos.py', 'macos_bundle.py', 'package_support.py'):
+            shutil.copyfile(ROOT / 'tools/deploy' / name, staging / name)
+        shutil.copyfile(ROOT / 'tools/report_values.py', staging / 'report_values.py')
+        (staging / 'README.md').write_text('''# yalahOO!!!
+
+Open yalahoo.app for your local library, or run its Contents/MacOS/yalahoo --demo.
+Keep the bundle intact when copying it. It includes Qt frameworks, QML, plugins,
+media dependencies, fonts, shaders, branding and attribution in Contents/Resources/licenses.
+This local package is ad-hoc signed; it is not a notarized distribution.
+
+Run python3 verify-macos.py for hidden product/QML/resource/media loading checks.
+The verifier requires Python only as a developer tool; the application does not.
+Use a fresh output directory outside the package. Reports do not establish physical
+input, audible playback, device changes, normal VSYNC or screen presentation.
+Complete manual checks and source build steps: docs/platforms/macos.md in the repository.
+''')
+        package = dict(displayName='yalahOO!!!', qtVersion=metadata['qtVersion'],
+                       architecture=closure['architectures'], minimumMacOS=closure['minimumMacOS'],
+                       configuration='Release', review=False,
+                       deployToolSha256=digest(deploy), files=inventory(staging))
+        (staging / 'package.json').write_text(json.dumps(package, indent=2) + '\n')
+        # A real clean child probe must pass before replacing an existing package.
+        subprocess.run(['python3', str(staging / 'verify-macos.py'), '--package', str(staging)], check=True)
+        install_package(staging, output)
+    print(f'macOS production package: {output}')
+
+
+if __name__ == '__main__':
+    main()

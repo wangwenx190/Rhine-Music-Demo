@@ -1,0 +1,815 @@
+// Uses controllable anonymous backends to test timeout, cancellation and late metadata
+// publication. Explicit fixture literals are independent inputs or expected results; timing
+// bounds have named constants.
+
+#include "../support/FileFixture.h"
+#include "ArtworkStore.h"
+#include "LegacyImporter.h"
+#include "LibraryStore.h"
+#include "LibrarySession.h"
+#include "OfflineMetadataProvider.h"
+#include "PreferencesStore.h"
+#include "MediaMetadataProbe.h"
+#include <QBuffer>
+#include <QDataStream>
+#include <QDate>
+#include <QFile>
+#include <QDir>
+#include <QFileInfo>
+#include <QImage>
+#include <QImageReader>
+#include <QImageIOHandler>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QSignalSpy>
+#include <QScopeGuard>
+#include <QTemporaryDir>
+#include <QTest>
+#include <QTimer>
+#include <atomic>
+#include <filesystem>
+
+using namespace Qt::StringLiterals;
+
+using namespace yalahoo;
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int AsyncDeadlineMilliseconds = 10000;
+constexpr int EnrichmentDeadlineMilliseconds = 15000;
+constexpr int ProbeTimeoutDeadlineMilliseconds = 11000;
+
+QByteArray chunk(const char *name, QByteArray bytes)
+{
+    QByteArray result(name, 4);
+    QDataStream stream(&result, QIODevice::Append);
+    stream.setByteOrder(QDataStream::LittleEndian);
+    stream << quint32(bytes.size());
+    result += bytes;
+    if (bytes.size() % 2)
+        result += '\0';
+    return result;
+}
+QByteArray wave(const QImage &embedded = { })
+{
+    // Anonymous silent test input, generated locally. No production PCM path.
+    QByteArray format;
+    QDataStream stream(&format, QIODevice::WriteOnly);
+    stream.setByteOrder(QDataStream::LittleEndian);
+    stream << quint16(1) << quint16(1) << quint32(8000) << quint32(16000) << quint16(2)
+           << quint16(16);
+    const auto info = "INFO"_ba + chunk("INAM", "Anonymous Title\0"_ba)
+            + chunk("IART", "Anonymous Artist\0"_ba) + chunk("IPRD", "Anonymous Album\0"_ba);
+    QByteArray artwork;
+    if (!embedded.isNull()) {
+        QByteArray png;
+        QBuffer buffer(&png);
+        buffer.open(QIODevice::WriteOnly);
+        embedded.save(&buffer, "PNG");
+        QByteArray frame = "APIC"_ba;
+        const auto payload = "\0image/png\0\x03\0"_ba + png;
+        QDataStream sizes(&frame, QIODevice::Append);
+        sizes.setByteOrder(QDataStream::BigEndian);
+        sizes << quint32(payload.size()) << quint16(0);
+        frame += payload;
+        QByteArray id3 = "ID3\x03\0\0"_ba;
+        for (int shift : { 21, 14, 7, 0 })
+            id3.append(char((frame.size() >> shift) & 0x7f));
+        id3 += frame;
+        artwork = chunk("id3 ", id3);
+    }
+    const auto body = "WAVE"_ba + chunk("fmt ", format) + chunk("LIST", info) + artwork
+            + chunk("data", QByteArray(1600, '\0'));
+    return chunk("RIFF", body);
+}
+Snapshot scanned(const QString &root)
+{
+    return DirectoryScanner::scan({ QUrl::fromLocalFile(root) }, { }, { }).snapshot;
+}
+struct FakeStats final
+{
+    std::atomic_int created = 0, active = 0, peak = 0, opens = 0, clears = 0;
+    std::atomic_bool offGui = true;
+};
+class FakeSource final : public MetadataSource
+{
+    Q_DISABLE_COPY_MOVE(FakeSource)
+public:
+    FakeSource(QObject *parent, std::shared_ptr<FakeStats> stats, MediaObservation value, int delay)
+        : MetadataSource(parent), m_stats(std::move(stats)), m_value(value), m_delay(delay)
+    {
+    }
+    void open(const QUrl &) override
+    {
+        m_current = { };
+        m_busy = true;
+        ++m_stats->opens;
+        const auto active = ++m_stats->active;
+        m_stats->peak.store(qMax(m_stats->peak.load(), active));
+        const auto serial = ++m_serial;
+        if (m_delay >= 0)
+            QTimer::singleShot(m_delay, this, [this, serial] {
+                if (serial == m_serial)
+                    m_current = m_value;
+                // Deliberately deliver an obsolete notification after cancellation.
+                Q_EMIT changed();
+            });
+    }
+    void clear() override
+    {
+        ++m_serial;
+        if (m_busy) {
+            --m_stats->active;
+            ++m_stats->clears;
+            m_busy = false;
+        }
+        m_current = { };
+    }
+    MediaObservation observation() const override
+    {
+        return m_current;
+    }
+
+private:
+    std::shared_ptr<FakeStats> m_stats;
+    MediaObservation m_value, m_current;
+    int m_delay;
+    quint64 m_serial = 0;
+    bool m_busy = false;
+};
+MediaMetadataProbe::Factory factory(std::shared_ptr<FakeStats> stats, MediaObservation value,
+                                    int delay = 0)
+{
+    const auto gui = QThread::currentThread();
+    return [stats, value, delay, gui](QObject *parent) {
+        ++stats->created;
+        if (QThread::currentThread() == gui)
+            stats->offGui = false;
+        return new FakeSource(parent, stats, value, delay);
+    };
+}
+Snapshot resultOf(const QSignalSpy &spy, int index = 0)
+{
+    return qvariant_cast<Snapshot>(spy.at(index).at(1));
+}
+}
+class MediaMetadataTest final : public QObject
+{
+    Q_OBJECT
+    Q_DISABLE_COPY_MOVE(MediaMetadataTest)
+public:
+    MediaMetadataTest() = default;
+
+private Q_SLOTS:
+    void publicMetadataAndPriority();
+    void realSilentAndInvalid();
+    void realEmbeddedPriority();
+    void timeout();
+    void artworkTimeoutAfterCachedProbeRetries();
+    void cancellationAndReuse();
+    void artworkGuards();
+    void artworkValidationUsesContentRatherThanPaths();
+    void artworkValidationRespectsAllocationPolicy();
+    void embeddedAllocationAccounting();
+    void artworkSymlink();
+    void legacy_data();
+    void legacy();
+    void legacyErrorsAndCancellation();
+    void storeImportAndPreferences();
+    void storeProbeReplacement();
+};
+void MediaMetadataTest::publicMetadataAndPriority()
+{
+    QTemporaryDir temp;
+    const auto root = temp.filePath(u"\u97f3\u4e50 # %"_s);
+    QVERIFY(test::writeFile(root + u"/\u4e13\u8f91/2.wav"_s, wave()));
+    QVERIFY(test::writeFile(root + u"/\u4e13\u8f91/1.wav"_s, wave()));
+    QVERIFY(test::writeFile(root + u"/\u5355\u66f2.wav"_s, wave()));
+    QImage red(24, 16, QImage::Format_ARGB32);
+    red.fill(Qt::red);
+    QDir().mkpath(root + u"/\u4e13\u8f91"_s);
+    QVERIFY(red.save(root + u"/\u4e13\u8f91/cover.png"_s));
+    QImage blue(16, 24, QImage::Format_ARGB32);
+    blue.fill(Qt::blue);
+    QVERIFY(blue.save(root + u"/\u4e13\u8f91/folder.png"_s));
+    QVERIFY(red.save(root + u"/\u5355\u66f2.png"_s));
+    MediaObservation value;
+    value.status = MediaObservation::Loaded;
+    value.hasAudio = true;
+    value.durationMs = 1234;
+    value.metadata.insert(QMediaMetaData::Title, u"\u6807\u9898 Unicode"_s);
+    value.metadata.insert(QMediaMetaData::AlbumTitle, u"\u4e13\u8f91\u6807\u9898"_s);
+    value.metadata.insert(QMediaMetaData::AlbumArtist, u"\u4e13\u8f91\u827a\u672f\u5bb6"_s);
+    value.metadata.insert(QMediaMetaData::ContributingArtist,
+                          QStringList{ u"\u6b4c\u624b\u7532"_s, u"\u6b4c\u624b\u4e59"_s });
+    value.metadata.insert(QMediaMetaData::TrackNumber, 4);
+    value.metadata.insert(QMediaMetaData::Date, QDate(2020, 2, 3));
+    value.metadata.insert(QMediaMetaData::Genre, QStringList{ u"Rock"_s, u"Pop"_s });
+    value.metadata.insert(QMediaMetaData::CoverArtImage, blue);
+    auto stats = std::make_shared<FakeStats>();
+    MediaMetadataProbe probe(nullptr, factory(stats, value, 10));
+    QSignalSpy done(&probe, &MediaMetadataProbe::finished);
+    auto next = *scanned(root);
+    next.albums[0].localNote = u"\u4fdd\u7559\u5907\u6ce8"_s;
+    next.albums[0].tracks[0].bitsPerSample = 24;
+    next.albums[0].tracks[0].fields.insert(u"future"_s, 9);
+    probe.start(std::make_shared<const LibrarySnapshot>(next), temp.filePath(u"native"_s), { }, 1);
+    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, AsyncDeadlineMilliseconds);
+    const auto result = resultOf(done);
+    QVERIFY(result);
+    QCOMPARE(stats->created, 2);
+    QCOMPARE(stats->peak, 2);
+    QVERIFY(stats->offGui);
+    for (const auto &album : result->albums) {
+        const auto &track = album.tracks.first();
+        QCOMPARE(track.title, u"\u6807\u9898 Unicode"_s);
+        QCOMPARE(track.duration, 1.234);
+        QCOMPARE(track.trackNumber.value(), 4);
+        QCOMPARE(track.mediaSupport, MediaSupport::Unknown);
+        QCOMPARE(album.year.value(), 2020);
+        QCOMPARE(album.rawGenres, (QStringList{ u"Rock"_s, u"Pop"_s }));
+        const auto color = QImage(album.coverUrl.toLocalFile()).pixelColor(0, 0);
+        QCOMPARE(color,
+                 album.fields.value(u"_singleFile"_s).toBool() ? QColor(Qt::blue)
+                                                               : QColor(Qt::red));
+    }
+    QCOMPARE(result->albums[0].localNote, u"\u4fdd\u7559\u5907\u6ce8"_s);
+    QCOMPARE(result->albums[0].tracks[0].bitsPerSample.value(), 24);
+    QCOMPARE(result->albums[0].tracks[0].fields.value(u"future"_s).toInt(), 9);
+    const auto opens = stats->opens.load();
+    probe.start(result, temp.filePath(u"native"_s), { }, 2);
+    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 2, AsyncDeadlineMilliseconds);
+    QCOMPARE(stats->opens, opens);
+    QCOMPARE(stats->created, 2);
+    QCOMPARE(resultOf(done, 1)->albums[0].coverUrl, result->albums[0].coverUrl);
+    QVERIFY(test::writeFile(root + u"/\u4e13\u8f91/cover.png"_s, "corrupt preferred image"_ba));
+    const auto changed =
+            DirectoryScanner::scan({ QUrl::fromLocalFile(root) }, result, { }).snapshot;
+    probe.start(changed, temp.filePath(u"native"_s), { }, 3);
+    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 3, AsyncDeadlineMilliseconds);
+    QCOMPARE(stats->opens, opens);
+    for (const auto &album : resultOf(done, 2)->albums)
+        QCOMPARE(QImage(album.coverUrl.toLocalFile()).pixelColor(0, 0), QColor(Qt::blue));
+    QVERIFY(QFile::remove(root + u"/\u4e13\u8f91/cover.png"_s));
+    QVERIFY(QFile::remove(root + u"/\u4e13\u8f91/folder.png"_s));
+    const auto withoutExternal =
+            DirectoryScanner::scan({ QUrl::fromLocalFile(root) }, resultOf(done, 2), { }).snapshot;
+    probe.start(withoutExternal, temp.filePath(u"native"_s), { }, 4);
+    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 4, AsyncDeadlineMilliseconds);
+    QCOMPARE(stats->opens, opens + 2);
+    for (const auto &album : resultOf(done, 3)->albums)
+        QCOMPARE(QImage(album.coverUrl.toLocalFile()).pixelColor(0, 0), QColor(Qt::blue));
+    Album removed;
+    removed.fields.insert(u"coverUrl"_s, u"file:///old-cover.png"_s);
+    QVERIFY(!toJson(removed).contains(u"coverUrl"_s));
+}
+void MediaMetadataTest::realSilentAndInvalid()
+{
+    QTemporaryDir temp;
+    const auto root = temp.filePath(u"\u66f2\u5e93 Unicode"_s);
+    const auto wav = root + u"/\u4e13\u8f91/valid.wav"_s;
+    QVERIFY(test::writeFile(wav, wave()));
+    QVERIFY(test::writeFile(root + u"/\u4e13\u8f91/broken.wav"_s, "broken"_ba));
+    const auto original = yalahoo::test::readFile(wav);
+    MediaMetadataProbe probe;
+    QSignalSpy done(&probe, &MediaMetadataProbe::finished);
+    int ticks = 0;
+    QTimer heartbeat;
+    connect(&heartbeat, &QTimer::timeout, this, [&] {
+        ++ticks;
+    });
+    heartbeat.start(1);
+    probe.start(scanned(root), temp.filePath(u"native"_s), { }, 3);
+    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, EnrichmentDeadlineMilliseconds);
+    const auto result = resultOf(done);
+    QCOMPARE(result->albums.size(), 1);
+    QCOMPARE(result->albums.first().tracks.size(), 2);
+    for (const auto &track : result->albums.first().tracks) {
+        if (track.sourceUrl.toLocalFile().endsWith(u"valid.wav"_s)) {
+            QCOMPARE(track.mediaSupport, MediaSupport::Unknown);
+            QCOMPARE(track.title, u"Anonymous Title"_s);
+            QVERIFY(qAbs(track.duration - .1) < .002);
+        } else {
+            QCOMPARE(track.mediaSupport, MediaSupport::Unsupported);
+            QCOMPARE(track.title, u"broken"_s);
+            QCOMPARE(track.fields.value(u"_probeStatus"_s).toString(), u"invalid"_s);
+        }
+    }
+    QVERIFY(ticks > 0);
+    QCOMPARE(yalahoo::test::readFile(wav), original);
+}
+void MediaMetadataTest::realEmbeddedPriority()
+{
+    QTemporaryDir temp;
+    const auto root = temp.filePath(u"music"_s);
+    QImage embedded(20, 12, QImage::Format_ARGB32);
+    embedded.fill(Qt::blue);
+    QImage directory(12, 20, QImage::Format_ARGB32);
+    directory.fill(Qt::red);
+    QVERIFY(test::writeFile(root + u"/single.wav"_s, wave(embedded)));
+    QVERIFY(test::writeFile(root + u"/album/song.wav"_s, wave(embedded)));
+    QVERIFY(test::writeFile(root + u"/fallback.wav"_s, wave()));
+    QVERIFY(directory.save(root + u"/fallback.png"_s));
+    QVERIFY(directory.save(root + u"/single.png"_s));
+    QVERIFY(directory.save(root + u"/album/cover.png"_s));
+    MediaMetadataProbe probe;
+    QSignalSpy done(&probe, &MediaMetadataProbe::finished);
+    probe.start(scanned(root), temp.filePath(u"native"_s), { }, 7);
+    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, EnrichmentDeadlineMilliseconds);
+    for (const auto &album : resultOf(done)->albums) {
+        QVERIFY(!album.coverUrl.isEmpty());
+        QCOMPARE(QImage(album.coverUrl.toLocalFile()).pixelColor(0, 0),
+                 album.tracks.first().sourceUrl.toLocalFile().endsWith(u"/single.wav"_s)
+                         ? QColor(Qt::blue)
+                         : QColor(Qt::red));
+    }
+}
+void MediaMetadataTest::timeout()
+{
+    QTemporaryDir temp;
+    QVERIFY(test::writeFile(temp.filePath(u"root/hang.wav"_s), wave()));
+    auto stats = std::make_shared<FakeStats>();
+    MediaMetadataProbe probe(nullptr, factory(stats, { }, -1));
+    QSignalSpy done(&probe, &MediaMetadataProbe::finished);
+    probe.start(scanned(temp.filePath(u"root"_s)), temp.filePath(u"native"_s), { }, 4);
+    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, ProbeTimeoutDeadlineMilliseconds);
+    const auto track = resultOf(done)->albums.first().tracks.first();
+    QCOMPARE(track.mediaSupport, MediaSupport::Unknown);
+    QCOMPARE(track.fields.value(u"_probeStatus"_s).toString(), u"timeout"_s);
+    QCOMPARE(track.title, u"hang"_s);
+    QCOMPARE(stats->active, 0);
+    QVERIFY(!track.fields.contains(u"_qtProbeVersion"_s));
+}
+void MediaMetadataTest::artworkTimeoutAfterCachedProbeRetries()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+    const auto root = temp.filePath(u"root"_s);
+    const auto native = temp.filePath(u"native"_s);
+    const auto external = root + u"/album/cover.png"_s;
+    QVERIFY(test::writeFile(root + u"/album/song.wav"_s, wave()));
+    QImage image(8, 8, QImage::Format_RGB32);
+    image.fill(Qt::red);
+    QVERIFY(image.save(external));
+    MediaObservation loaded;
+    loaded.status = MediaObservation::Loaded;
+    loaded.hasAudio = true;
+    auto stats = std::make_shared<FakeStats>();
+    Snapshot cached;
+    {
+        MediaMetadataProbe probe(nullptr, factory(stats, loaded, 0));
+        QSignalSpy done(&probe, &MediaMetadataProbe::finished);
+        probe.start(scanned(root), native, { }, 1);
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, AsyncDeadlineMilliseconds);
+        cached = resultOf(done);
+    }
+    QCOMPARE(stats->opens, 1);
+    QVERIFY(cached->albums.first().tracks.first().fields.contains(u"_qtProbeVersion"_s));
+    QVERIFY(QFile::remove(external));
+    const auto withoutExternal =
+            DirectoryScanner::scan({ QUrl::fromLocalFile(root) }, cached, { }).snapshot;
+    Snapshot timedOut;
+    {
+        MediaMetadataProbe probe(nullptr, factory(stats, { }, -1));
+        QSignalSpy done(&probe, &MediaMetadataProbe::finished);
+        probe.start(withoutExternal, native, { }, 2);
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, ProbeTimeoutDeadlineMilliseconds);
+        timedOut = resultOf(done);
+    }
+    QCOMPARE(stats->opens, 2);
+    const auto &track = timedOut->albums.first().tracks.first();
+    QCOMPARE(track.fields.value(u"_probeStatus"_s).toString(), u"timeout"_s);
+    QVERIFY(!track.fields.contains(u"_qtProbeVersion"_s));
+    QVERIFY(!track.fields.contains(u"_embeddedCover"_s));
+    image.fill(Qt::blue);
+    loaded.metadata.insert(QMediaMetaData::CoverArtImage, image);
+    MediaMetadataProbe retry(nullptr, factory(stats, loaded, 0));
+    QSignalSpy done(&retry, &MediaMetadataProbe::finished);
+    const auto unchanged =
+            DirectoryScanner::scan({ QUrl::fromLocalFile(root) }, timedOut, { }).snapshot;
+    retry.start(unchanged, native, { }, 3);
+    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, AsyncDeadlineMilliseconds);
+    QCOMPARE(stats->opens, 3);
+    const auto result = resultOf(done);
+    QCOMPARE(QImage(result->albums.first().coverUrl.toLocalFile()).pixelColor(0, 0),
+             QColor(Qt::blue));
+    QVERIFY(result->albums.first().tracks.first().fields.contains(u"_qtProbeVersion"_s));
+}
+void MediaMetadataTest::cancellationAndReuse()
+{
+    QTemporaryDir temp;
+    for (int i = 0; i < 80; ++i)
+        QVERIFY(test::writeFile(temp.filePath(u"root/album/"_s) + QString::number(i) + u".wav"_s,
+                                wave()));
+    auto stats = std::make_shared<FakeStats>();
+    MediaObservation loaded;
+    loaded.status = MediaObservation::Loaded;
+    loaded.hasAudio = true;
+    MediaMetadataProbe probe(nullptr, factory(stats, loaded, 100));
+    QSignalSpy done(&probe, &MediaMetadataProbe::finished);
+    const auto snapshot = scanned(temp.filePath(u"root"_s));
+    auto cancel = std::make_shared<std::atomic_bool>(false);
+    probe.start(snapshot, temp.filePath(u"native"_s), cancel, 10);
+    QTRY_COMPARE(stats->active.load(), 2);
+    cancel->store(true);
+    probe.cancel();
+    probe.start(snapshot, temp.filePath(u"native"_s), { }, 11);
+    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 2, AsyncDeadlineMilliseconds);
+    QVERIFY(done[0][2].toBool());
+    QVERIFY(!resultOf(done));
+    QCOMPARE(done[1][0].toULongLong(), 11);
+    QVERIFY(resultOf(done, 1));
+    QCOMPARE(stats->created, 2);
+    QCOMPARE(stats->peak, 2);
+    QCOMPARE(stats->active, 0);
+    QCOMPARE(resultOf(done, 1)->albums.first().tracks.size(), 80);
+}
+void MediaMetadataTest::artworkGuards()
+{
+    QTemporaryDir temp;
+    const auto native = temp.filePath(u"native"_s);
+    QImage large(2049, 2048, QImage::Format_RGB32);
+    large.fill(Qt::red);
+    const auto path = temp.filePath(u"large.png"_s);
+    QVERIFY(large.save(path));
+    QString error;
+    const auto limit = QImageReader::allocationLimit();
+    const bool allowed = limit == 0 || large.sizeInBytes() <= qint64(limit) * 1024 * 1024;
+    QCOMPARE(!ArtworkStore::copy(path, native, &error).isEmpty(), allowed);
+    QCOMPARE(!ArtworkStore::save(large, native, &error).isEmpty(), allowed);
+    QVERIFY(test::writeFile(temp.filePath(u"broken.png"_s), "not an image"_ba));
+    QVERIFY(ArtworkStore::copy(temp.filePath(u"broken.png"_s), native, &error).isEmpty());
+    QFile oversized(temp.filePath(u"oversized.png"_s));
+    QVERIFY(oversized.open(QIODevice::WriteOnly));
+    QVERIFY(oversized.resize(ArtworkStore::maximumBytes + 1));
+    oversized.close();
+    QVERIFY(ArtworkStore::copy(oversized.fileName(), native, &error).isEmpty());
+    QImage small(32, 16, QImage::Format_ARGB32);
+    small.fill(Qt::transparent);
+    const auto a = ArtworkStore::save(small, native, &error);
+    QVERIFY(!a.isEmpty());
+    const auto before = yalahoo::test::readFile(a.toLocalFile());
+    QCOMPARE(ArtworkStore::save(small, native), a);
+    QCOMPARE(yalahoo::test::readFile(a.toLocalFile()), before);
+    small.fill(Qt::blue);
+    QVERIFY(ArtworkStore::save(small, native) != a);
+    QVERIFY(!ArtworkStore::save(small, temp.filePath(u"blocked/file"_s), &error).isEmpty());
+    QVERIFY(test::writeFile(temp.filePath(u"read-only-parent"_s), "file"_ba));
+    QVERIFY(ArtworkStore::save(small, temp.filePath(u"read-only-parent/native"_s), &error)
+                    .isEmpty());
+}
+void MediaMetadataTest::artworkValidationUsesContentRatherThanPaths()
+{
+    QTemporaryDir directory;
+    const auto source = directory.filePath(u"source.png"_s);
+    const auto firstRoot = directory.filePath(u"first"_s);
+    const auto secondRoot = directory.filePath(u"second"_s);
+    QImage image(32, 16, QImage::Format_RGBA8888);
+    image.fill(Qt::red);
+    QVERIFY(image.save(source));
+    QString error;
+    const auto first = ArtworkStore::copy(source, firstRoot, &error);
+    QVERIFY2(!first.isEmpty(), qPrintable(error));
+    QCOMPARE(ArtworkStore::copy(source, firstRoot, &error), first);
+    const auto second = ArtworkStore::copy(source, secondRoot, &error);
+    QVERIFY(!second.isEmpty());
+    QCOMPARE(QImage(second.toLocalFile()).pixelColor(0, 0), QColor(Qt::red));
+    image.fill(Qt::blue);
+    QVERIFY(image.save(source));
+    const auto changed = ArtworkStore::copy(source, firstRoot, &error);
+    QVERIFY(!changed.isEmpty() && changed != first);
+    QCOMPARE(QImage(changed.toLocalFile()).pixelColor(0, 0), QColor(Qt::blue));
+    QCOMPARE(QImage(first.toLocalFile()).pixelColor(0, 0), QColor(Qt::red));
+    // Keep a recognizable PNG header but corrupt its image payload after a successful copy.
+    auto truncated = test::readFile(source).first(33);
+    QVERIFY(test::writeFile(source, truncated));
+    QVERIFY(ArtworkStore::copy(source, firstRoot, &error).isEmpty());
+    QVERIFY(!error.isEmpty());
+}
+void MediaMetadataTest::artworkValidationRespectsAllocationPolicy()
+{
+    // This synchronous test has no image workers; restore the process policy before returning.
+    const auto previous = QImageReader::allocationLimit();
+    const auto restore = qScopeGuard([previous] {
+        QImageReader::setAllocationLimit(previous);
+    });
+    QTemporaryDir directory;
+    const auto source = directory.filePath(u"source.png"_s);
+    const auto native = directory.filePath(u"native"_s);
+    QImage image(1024, 512, QImage::Format_RGBA8888);
+    image.fill(Qt::green);
+    QVERIFY(image.save(source));
+    QImageReader::setAllocationLimit(0);
+    QVERIFY(!ArtworkStore::copy(source, native).isEmpty());
+    QImageReader::setAllocationLimit(1);
+    QString error;
+    QVERIFY(ArtworkStore::copy(source, native, &error).isEmpty());
+    QVERIFY(!error.isEmpty());
+    QImageReader::setAllocationLimit(0);
+    QVERIFY(!ArtworkStore::copy(source, native, &error).isEmpty());
+    QVERIFY(error.isEmpty());
+}
+void MediaMetadataTest::embeddedAllocationAccounting()
+{
+    QTemporaryDir directory;
+    for (const auto format : { QImage::Format_Grayscale8, QImage::Format_RGBA64 }) {
+        QImage image(1025, 1024, format);
+        image.fill(Qt::red);
+        QImage allocation;
+        const bool allowed = QImageIOHandler::allocateImage(image.size(), format, &allocation);
+        QString error;
+        QCOMPARE(!ArtworkStore::save(image, directory.path(), &error).isEmpty(), allowed);
+        QCOMPARE(error.isEmpty(), allowed);
+    }
+}
+void MediaMetadataTest::artworkSymlink()
+{
+    QTemporaryDir temp;
+    const auto source = temp.filePath(u"legacy-artwork"_s);
+    const auto native = temp.filePath(u"native"_s);
+    QVERIFY(QDir().mkpath(source));
+    QVERIFY(QDir().mkpath(native));
+    const auto path = [](const QString &value) {
+#ifdef Q_OS_WIN
+        return std::filesystem::path(value.toStdWString());
+#else
+        return std::filesystem::path(value.toUtf8().toStdString());
+#endif
+    };
+    std::error_code error;
+    std::filesystem::create_directory_symlink(path(source), path(native + "/artwork"_L1), error);
+#ifdef Q_OS_WIN
+    if (error)
+        QSKIP("Native symlink permission unavailable; target coverage remains R22-P.");
+#endif
+    QVERIFY2(!error, error.message().c_str());
+    QImage image(32, 32, QImage::Format_ARGB32);
+    image.fill(Qt::red);
+    QString failure;
+    QVERIFY(ArtworkStore::save(image, native, &failure).isEmpty());
+    QVERIFY(!failure.isEmpty());
+    QCOMPARE(QDir(source).entryList(QDir::Files).size(), 0);
+}
+void MediaMetadataTest::legacy_data()
+{
+    QTest::addColumn<int>("version");
+    QTest::newRow("metadata-v3") << 3;
+    QTest::newRow("metadata-v4") << 4;
+}
+void MediaMetadataTest::legacy()
+{
+    QFETCH(int, version);
+    QTemporaryDir temp;
+    const auto music = temp.filePath(u"\u97f3\u4e50 # %"_s);
+    const auto source = temp.filePath(u"music-data-v3"_s);
+    const auto native = temp.filePath(u"native"_s);
+    QVERIFY(test::writeFile(music + u"/\u4e13\u8f91/song.wav"_s, wave()));
+    QImage image(32, 16, QImage::Format_ARGB32);
+    image.fill(Qt::blue);
+    QDir().mkpath(source + "/artwork"_L1);
+    QVERIFY(image.save(source + u"/artwork/old.png"_s));
+    auto next = *scanned(music);
+    auto &album = next.albums.first();
+    album.localNote = u"\u672c\u5730\u5907\u6ce8"_s;
+    album.descriptionSource.insert(u"url"_s, u"https://example.invalid/source"_s);
+    album.producers.append({ u"\u5236\u4f5c\u4eba"_s,
+                             u"\u5236\u4f5c"_s,
+                             u"local"_s,
+                             album.tracks.first().id,
+                             u"\u6b4c\u66f2"_s,
+                             { },
+                             { } });
+    album.fields.insert(u"futureAlbum"_s, QJsonObject{ { u"unknown"_s, 1 } });
+    album.fields.insert(
+            u"_cover"_s,
+            QJsonObject{ { u"path"_s, source + "/artwork/old.png"_L1 }, { u"embedded"_s, true } });
+    auto &track = album.tracks.first();
+    track.fields.insert(u"_embeddedCover"_s, album.fields.value(u"_cover"_s));
+    track.fields.insert(u"_common"_s, QJsonObject{ { u"producer"_s, u"\u4fdd\u7559"_s } });
+    track.fields.insert(u"futureTrack"_s, 7);
+    auto json = toJson(next);
+    auto inputAlbums = json.value(u"albums"_s).toArray();
+    auto inputAlbum = inputAlbums.first().toObject();
+    auto inputTracks = inputAlbum.value(u"tracks"_s).toArray();
+    auto inputTrack = inputTracks.first().toObject();
+    inputTrack.insert(u"_metadataVersion"_s, version);
+    inputTrack.insert(u"_path"_s, track.sourceUrl.toLocalFile());
+    inputTracks[0] = inputTrack;
+    inputAlbum.insert(u"tracks"_s, inputTracks);
+    inputAlbum.insert(u"_cover"_s, album.fields.value(u"_cover"_s));
+    inputAlbum.insert(u"_root"_s, music);
+    inputAlbums[0] = inputAlbum;
+    json.insert(u"albums"_s, inputAlbums);
+    json.insert(u"version"_s, 1);
+    json.insert(u"futureIndex"_s, 42);
+    QVERIFY(test::writeFile(source + u"/library-index.json"_s, QJsonDocument(json).toJson()));
+    const auto cancelled = std::make_shared<std::atomic_bool>(false);
+    int copies = 0;
+    const auto interrupted = LegacyImporter::read(
+            source, native, cancelled, [&](const QString &path, const QString &, QString *) {
+                ++copies;
+                cancelled->store(true, std::memory_order_relaxed);
+                return QUrl::fromLocalFile(path);
+            });
+    QVERIFY(interrupted.cancelled);
+    QVERIFY(!interrupted.snapshot);
+    QVERIFY(interrupted.error.isEmpty());
+    QCOMPARE(copies, 1); // Neither the album cover nor subsequent tracks may start I/O.
+    const auto before = yalahoo::test::readFile(source + "/library-index.json"_L1);
+    for (const auto &claimedRoot : { QDir::rootPath(), temp.filePath(u"other-music"_s) }) {
+        const QJsonObject config{ { u"version"_s, 1 }, { u"roots"_s, QJsonArray{ music } } };
+        QVERIFY(test::writeFile(source + u"/config.json"_s, QJsonDocument(config).toJson()));
+        auto escaped = inputAlbum;
+        escaped[u"_root"_s] = claimedRoot;
+        escaped[u"_cover"_s] = QJsonObject{ { u"path"_s, source + u"/artwork/old.png"_s },
+                                            { u"embedded"_s, false } };
+        auto index = json;
+        index[u"albums"_s] = QJsonArray{ escaped };
+        QVERIFY(test::writeFile(source + u"/library-index.json"_s, QJsonDocument(index).toJson()));
+        const auto rejected = LegacyImporter::read(source, native, { });
+        QVERIFY(!rejected.snapshot);
+        QVERIFY(!rejected.error.isEmpty());
+        QVERIFY(!QFileInfo::exists(native));
+    }
+    QVERIFY(test::writeFile(source + u"/library-index.json"_s, before));
+
+    QVERIFY(test::writeFile(
+            source + u"/genre-rules.json"_s,
+            QJsonDocument(QJsonObject{ { u"genres"_s,
+                                         QJsonArray{ QJsonObject{ { u"id"_s, u"manual"_s },
+                                                                  { u"name"_s, u"Manual"_s } } } },
+                                       { u"albumOverrides"_s,
+                                         QJsonObject{ { album.id, u"manual"_s } } } })
+                    .toJson()));
+    QVERIFY(test::writeFile(
+            source + u"/config.json"_s,
+            QJsonDocument(QJsonObject{ { u"version"_s, 1 },
+                                       { u"roots"_s, QJsonArray{ music } },
+                                       { u"onlineEnabled"_s, true },
+                                       { u"futureConfig"_s, 8 },
+                                       { u"musicBrainzContact"_s, u"project@example.invalid"_s } })
+                    .toJson()));
+    QVERIFY(test::writeFile(source + u"/pcm-cache/private"_s, "DO NOT COPY"_ba));
+    auto invalid = json;
+    auto badAlbum = inputAlbum;
+    auto badTrack = inputTrack;
+    badTrack.insert(u"duration"_s, u"invalid"_s);
+    badAlbum.insert(u"tracks"_s, QJsonArray{ badTrack });
+    invalid.insert(u"albums"_s, QJsonArray{ badAlbum });
+    QVERIFY(test::writeFile(source + u"/library-index.json"_s, QJsonDocument(invalid).toJson()));
+    const auto rejected = LegacyImporter::read(source, native, { });
+    QVERIFY(!rejected.snapshot);
+    QVERIFY(!rejected.error.isEmpty());
+    QVERIFY(!QFileInfo::exists(native));
+    const auto sentinel = native + u"/artwork/existing.png"_s;
+    QVERIFY(test::writeFile(sentinel, "existing artwork bytes"_ba));
+    QVERIFY(!LegacyImporter::read(source, native, { }).snapshot);
+    QCOMPARE(QDir(native + u"/artwork"_s).entryList(QDir::Files), QStringList{ u"existing.png"_s });
+    QCOMPARE(test::readFile(sentinel), "existing artwork bytes"_ba);
+    QVERIFY(test::writeFile(source + u"/library-index.json"_s, before));
+    const auto imported = LegacyImporter::read(source, native, { });
+    QVERIFY2(imported.snapshot, qPrintable(imported.error));
+    const auto &actual = imported.snapshot->albums.first();
+    QCOMPARE(actual.id, album.id);
+    QCOMPARE(actual.localNote, album.localNote);
+    QCOMPARE(actual.descriptionSource, album.descriptionSource);
+    QCOMPARE(actual.producers.first().trackId, track.id);
+    QCOMPARE(actual.tracks.first().fields.value(u"futureTrack"_s).toInt(), 7);
+    QCOMPARE(actual.tracks.first().mediaSupport, MediaSupport::Unknown);
+    QCOMPARE(actual.tracks.first().sourceUrl, track.sourceUrl);
+    const auto configuration =
+            imported.snapshot->fields.value(u"metadataConfiguration"_s).toObject();
+    QCOMPARE(configuration.value(u"futureConfig"_s).toInt(), 8);
+    QCOMPARE(configuration.value(u"musicBrainzContact"_s).toString(), u"project@example.invalid"_s);
+    for (const auto &key : { u"version"_s, u"roots"_s })
+        QVERIFY(!configuration.contains(key));
+    QVERIFY(actual.coverUrl.toLocalFile().startsWith(native + u"/artwork/"_s));
+    QVERIFY(!QFileInfo::exists(native + u"/pcm-cache"_s));
+    QVERIFY(!imported.snapshot->onlineEnabled);
+    QCOMPARE(imported.snapshot->fields.value(u"futureIndex"_s).toInt(), 42);
+    QCOMPARE(yalahoo::test::readFile(source + u"/library-index.json"_s), before);
+    QCOMPARE(QImage(actual.coverUrl.toLocalFile()).pixelColor(0, 0), QColor(Qt::blue));
+    // Rescan reuses imported fields and fingerprint; native probe fills only public metadata.
+    const auto rescanned =
+            DirectoryScanner::scan({ QUrl::fromLocalFile(music) }, imported.snapshot, { }).snapshot;
+    QCOMPARE(rescanned->albums.first().tracks.first().fields.value(u"futureTrack"_s).toInt(), 7);
+}
+void MediaMetadataTest::legacyErrorsAndCancellation()
+{
+    QTemporaryDir temp;
+    const auto source = temp.filePath(u"legacy"_s);
+    const auto native = temp.filePath(u"native"_s);
+    QVERIFY(test::writeFile(source + u"/library-index.json"_s, "broken"_ba));
+    QVERIFY(!LegacyImporter::read(source, native, { }).error.isEmpty());
+    QVERIFY(test::writeFile(source + u"/library-index.json"_s,
+                            "{\"version\":99,\"albums\":[]}"_ba));
+    QVERIFY(!LegacyImporter::read(source, native, { }).error.isEmpty());
+    QVERIFY(test::writeFile(source + u"/library-index.json"_s, "{\"version\":1,\"albums\":[]}"_ba));
+    QVERIFY(!LegacyImporter::read(source, source, { }).snapshot);
+    QVERIFY(!LegacyImporter::read(source, source + u"/nested"_s, { }).snapshot);
+    const auto deepSuffix = u"/d"_s.repeated(512);
+    const auto nested = LegacyImporter::read(source, source + deepSuffix, { });
+    QVERIFY(!nested.snapshot);
+    QVERIFY(nested.error.contains(u"separate"_s));
+    const auto sibling = LegacyImporter::read(source, native + deepSuffix, { });
+    QVERIFY2(sibling.snapshot, qPrintable(sibling.error));
+    QVERIFY(!QFileInfo::exists(native));
+#ifndef Q_OS_WIN
+    const auto alias = temp.filePath(u"alias"_s);
+    QVERIFY(QFile::link(source, alias));
+    const auto linked = LegacyImporter::read(source, alias + deepSuffix, { });
+    QVERIFY(!linked.snapshot);
+    QVERIFY(linked.error.contains(u"separate"_s));
+#endif
+    auto cancel = std::make_shared<std::atomic_bool>(true);
+    const auto result = LegacyImporter::read(source, native, cancel);
+    QVERIFY(result.cancelled);
+    QVERIFY(!result.snapshot);
+    QCOMPARE(yalahoo::test::readFile(source + u"/library-index.json"_s),
+             "{\"version\":1,\"albums\":[]}"_ba);
+}
+void MediaMetadataTest::storeImportAndPreferences()
+{
+    QTemporaryDir temp;
+    const auto source = temp.filePath(u"legacy"_s);
+    const auto native = temp.filePath(u"native"_s);
+    QVERIFY(test::writeFile(source + u"/library-index.json"_s,
+                            "{\"version\":1,\"albums\":[],\"future\":42}"_ba));
+    LibraryStore store(native);
+    OfflineMetadataProvider provider;
+    LibrarySession session(&provider);
+    QSignalSpy ready(&store, &LibraryStore::snapshotReady);
+    QSignalSpy resets(session.albums(), &QAbstractItemModel::modelReset);
+    connect(&store, &LibraryStore::snapshotReady, &session, [&](Snapshot snapshot) {
+        session.setSnapshot(*snapshot);
+    });
+    QVERIFY(store.importLegacy(QUrl::fromLocalFile(source)));
+    QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), AsyncDeadlineMilliseconds);
+    QCOMPARE(ready.size(), 1);
+    QCOMPARE(resets.size(), 1);
+    QCOMPARE(store.snapshot()->fields.value(u"future"_s).toInt(), 42);
+    const auto cache =
+            QJsonDocument::fromJson(yalahoo::test::readFile(native + "/library-index.json"_L1))
+                    .object();
+    QCOMPARE(cache.value(u"nativeSchemaVersion"_s).toInt(), 1);
+    PreferencesStore preferences(native);
+    QSignalSpy imported(&preferences, &PreferencesStore::imported);
+    QSignalSpy saved(&preferences, &PreferencesStore::saved);
+    const auto exported = temp.filePath(u"browser-export.json"_s);
+    QVERIFY(test::writeFile(
+            exported,
+            "{\"arrayMode\":\"realistic\",\"rememberColumnPosition\":false,\"future\":{\"x\":7}}"_ba));
+    const auto original = yalahoo::test::readFile(exported);
+    QVERIFY(preferences.importJson(QUrl::fromLocalFile(exported)));
+    QTRY_COMPARE(imported.size(), 1);
+    QTRY_VERIFY(saved.size() > 0);
+    QVERIFY(preferences.realistic());
+    QVERIFY(!preferences.rememberColumnPosition());
+    QCOMPARE(QJsonDocument::fromJson(yalahoo::test::readFile(native + u"/preferences.json"_s))
+                     .object()
+                     .value(u"future"_s)
+                     .toObject()
+                     .value(u"x"_s)
+                     .toInt(),
+             7);
+    QCOMPARE(yalahoo::test::readFile(exported), original);
+    QSignalSpy errors(&preferences, &PreferencesStore::saveError);
+    QVERIFY(test::writeFile(exported, "[]"_ba));
+    QVERIFY(preferences.importJson(QUrl::fromLocalFile(exported)));
+    QTRY_COMPARE(errors.size(), 1);
+    QCOMPARE(imported.size(), 1);
+    QVERIFY(test::writeFile(exported, "{\"arrayMode\":\"realistic\"}"_ba));
+    const auto saves = saved.size();
+    QVERIFY(preferences.importJson(QUrl::fromLocalFile(exported)));
+    preferences.setNavigation(true, false);
+    QTRY_VERIFY(saved.size() > saves);
+    QCOMPARE(imported.size(), 1);
+    QVERIFY(!preferences.realistic());
+}
+void MediaMetadataTest::storeProbeReplacement()
+{
+    QTemporaryDir temp;
+    const auto rootA = temp.filePath(u"first"_s);
+    const auto rootB = temp.filePath(u"last"_s);
+    for (int i = 0; i < 30; ++i)
+        QVERIFY(test::writeFile(rootA + u"/album/"_s + QString::number(i) + u".wav"_s, wave()));
+    QVERIFY(test::writeFile(rootB + u"/single.wav"_s, wave()));
+    LibraryStore store(temp.filePath(u"native"_s));
+    QSignalSpy ready(&store, &LibraryStore::snapshotReady);
+    bool replaced = false;
+    connect(&store, &LibraryStore::statusChanged, this, [&] {
+        if (!replaced && store.probing()) {
+            replaced = true;
+            store.setRoots({ QUrl::fromLocalFile(rootB) });
+        }
+    });
+    QVERIFY(store.setRoots({ QUrl::fromLocalFile(rootA) }));
+    QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), EnrichmentDeadlineMilliseconds);
+    QVERIFY(replaced);
+    QCOMPARE(ready.size(), 1);
+    QCOMPARE(store.snapshot()->albums.size(), 1);
+    QCOMPARE(store.snapshot()->albums.first().tracks.first().sourceUrl.toLocalFile(),
+             rootB + u"/single.wav"_s);
+    QVERIFY(!store.probing());
+}
+QTEST_GUILESS_MAIN(MediaMetadataTest)
+#include "MediaMetadataTest.moc"

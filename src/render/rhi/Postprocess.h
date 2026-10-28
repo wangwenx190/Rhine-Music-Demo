@@ -1,0 +1,53 @@
+// Owns the RHI postprocessing resource graph and pass submission. Attachments, uniforms and
+// sampling dependencies are rebuilt only when their inputs change.
+
+#pragma once
+#include "SceneFrame.h"
+#include "RhiApi.h"
+#include "PostprocessDefaults.h"
+#include <QJsonArray>
+#include <QJsonObject>
+#include <memory>
+
+namespace yalahoo::rhi {
+
+class ResourceInventory;
+struct PostSettings final
+{
+    QSize size;
+    int samples = 0;
+    float nearPlane = yalahoo::sceneDefaults::NearPlane,
+          farPlane = yalahoo::sceneDefaults::FarPlane, focus = postDefaults::FocusDistance,
+          aperture = postDefaults::Aperture;
+    float projectionX = 1, projectionY = 1;
+    float radius = postDefaults::AoRadius;
+    bool bokeh = false, smaa = false;
+};
+class Postprocess final
+{
+    Q_DISABLE_COPY_MOVE(Postprocess)
+public:
+    Postprocess();
+    ~Postprocess();
+    void reset();
+    void prepare(QRhi *api, const PostSettings &settings, QRhiTexture *color, QRhiTexture *aoNormal,
+                 QRhiTexture *aoDepth, QRhiTexture *dofDepth);
+    void render(QRhiCommandBuffer *cb);
+    QRhiTexture *output() const;
+    // Review returns intermediate targets; ordinary builds return nullptr.
+    QRhiTexture *smaaEdges() const;
+    QRhiTexture *smaaWeights() const;
+    QJsonArray passes() const;
+    QJsonObject graph(QRhiTexture *expectedSource) const;
+    QJsonObject submittedBokeh() const;
+    QRhiTexture *rawAo() const;
+    QRhiTexture *blurredAo() const;
+    quint64 revision() const;
+    qint64 uniformUploadBytes() const;
+    void inventory(ResourceInventory &inventory) const;
+
+private:
+    struct Private;
+    std::unique_ptr<Private> d;
+};
+}

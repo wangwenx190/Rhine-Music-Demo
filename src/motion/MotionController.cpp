@@ -1,0 +1,174 @@
+#include "SceneGeometry.h"
+#include "FrameClock.h"
+#include "MotionController.h"
+#include <algorithm>
+#include <cmath>
+
+namespace yalahoo {
+namespace {
+bool finiteValues(const ArchiveValues &values)
+{
+    return std::ranges::all_of(values, [](double value) {
+        return std::isfinite(value);
+    });
+}
+bool finiteSprings(const ArchiveSprings &springs)
+{
+    return std::ranges::all_of(springs, [](const auto &spring) {
+        return std::isfinite(spring.value) && std::isfinite(spring.velocity)
+                && std::isfinite(spring.acceleration);
+    });
+}
+}
+std::array<Kinematics, ArchiveAxisCount> ArchiveMotion::state() const
+{
+    std::array<Kinematics, ArchiveAxisCount> result;
+    for (size_t i = 0; i < result.size(); ++i)
+        result[i] = m_tracks[i].state();
+    return result;
+}
+void ArchiveMotion::observe(const ArchiveSprings &springs, const ArchiveValues &targets,
+                            const ArchiveValues &rates)
+{
+    if (m_active)
+        return;
+    for (size_t i = 0; i < m_tracks.size(); ++i) {
+        auto spring = springs[i];
+        spring.observe(targets[i], rates[i]);
+        m_tracks[i].observe(spring);
+    }
+}
+bool ArchiveMotion::retarget(const ArchiveSprings &springs, const ArchiveValues &targets)
+{
+    if (m_hasTarget && m_targets == targets)
+        return false;
+    const double duration = archiveTravelDuration((targets[ColumnAxis] - springs[ColumnAxis].value)
+                                                          / yalahoo::sceneGeometry::ColumnSpacing,
+                                                  (targets[RailAxis] - springs[RailAxis].value)
+                                                          / yalahoo::sceneGeometry::RowSpacing);
+    for (size_t i = 0; i < m_tracks.size(); ++i) {
+        auto state = m_tracks[i].state();
+        state.value = springs[i].value;
+        state.velocity = springs[i].velocity;
+        m_tracks[i].reset();
+        m_tracks[i].observe(state);
+        m_tracks[i].retarget(targets[i], duration);
+    }
+    m_targets = targets;
+    m_hasTarget = m_active = true;
+    return true;
+}
+void ArchiveMotion::update(ArchiveSprings &springs, double dt, bool reduced)
+{
+    if (!m_active)
+        return;
+    for (size_t i = 0; i < m_tracks.size(); ++i) {
+        m_tracks[i].update(dt, reduced);
+        static_cast<Kinematics &>(springs[i]) = m_tracks[i].state();
+    }
+    m_active = m_tracks[RailAxis].active();
+}
+void ArchiveMotion::translate(const ArchiveValues &offset)
+{
+    for (size_t i = 0; i < m_tracks.size(); ++i) {
+        m_tracks[i].translate(offset[i]);
+        if (m_hasTarget)
+            m_targets[i] += offset[i];
+    }
+}
+void ArchiveMotion::finish(ArchiveSprings &springs)
+{
+    update(springs, 0, true);
+}
+void ArchiveMotion::reset()
+{
+    for (auto &track : m_tracks)
+        track.reset();
+    m_hasTarget = m_active = false;
+}
+MotionController::MotionController(QObject *parent) : QObject(parent)
+{
+    connect(&m_clock, &FrameClock::frame, this, [this](double, double motionDt) {
+        step(motionDt);
+    });
+}
+void MotionController::observe(const ArchiveSprings &springs, const ArchiveValues &targets,
+                               const ArchiveValues &rates)
+{
+    if (moving() || !finiteSprings(springs) || !finiteValues(targets) || !finiteValues(rates))
+        return;
+    bool changed = false;
+    for (size_t i = 0; i < springs.size(); ++i) {
+        changed |= m_springs[i].value != springs[i].value
+                || m_springs[i].velocity != springs[i].velocity
+                || m_springs[i].acceleration != springs[i].acceleration;
+    }
+    m_springs = springs;
+    m_archive.observe(springs, targets, rates);
+    if (changed)
+        Q_EMIT stateChanged();
+}
+bool MotionController::retarget(const ArchiveValues &targets)
+{
+    if (!finiteValues(targets) || !m_archive.retarget(m_springs, targets))
+        return false;
+    ++m_revision;
+    Q_EMIT stateChanged();
+    if (m_reduced)
+        finish();
+    return true;
+}
+void MotionController::travel(double rail, double column, double shoulder, double lane)
+{
+    retarget({ rail, column, shoulder, lane });
+}
+void MotionController::translate(const ArchiveValues &offset)
+{
+    if (!finiteValues(offset))
+        return;
+    m_archive.translate(offset);
+    for (size_t i = 0; i < m_springs.size(); ++i)
+        m_springs[i].translate(offset[i]);
+    Q_EMIT stateChanged();
+}
+void MotionController::cancelTravel()
+{
+    // Detail uses rate-nine springs from displayed derivatives, never a browse polynomial.
+    if (!moving())
+        return;
+    m_archive.reset();
+    ++m_revision;
+    Q_EMIT stateChanged();
+}
+void MotionController::setReducedMotion(bool reduced)
+{
+    if (m_reduced == reduced)
+        return;
+    m_reduced = reduced;
+    Q_EMIT reducedMotionChanged();
+    if (reduced) {
+        finish();
+        m_clock.finishOpening();
+    }
+}
+void MotionController::step(double dt)
+{
+    if (!moving())
+        return;
+    m_archive.update(m_springs, dt, m_reduced);
+    const bool finished = !moving();
+    const auto revision = m_revision;
+    Q_EMIT stateChanged();
+    if (finished)
+        Q_EMIT completed(revision);
+}
+void MotionController::finish()
+{
+    if (!moving())
+        return;
+    m_archive.finish(m_springs);
+    const auto revision = m_revision;
+    Q_EMIT stateChanged();
+    Q_EMIT completed(revision);
+}
+}

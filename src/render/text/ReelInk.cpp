@@ -1,0 +1,167 @@
+#include "SampledReelCurve.h"
+#include "ReelInk.h"
+#include "ReelTextNode.h"
+#include <QSGClipNode>
+#include <QSGTextNode>
+#include <QSGTransformNode>
+#include <atomic>
+#include <algorithm>
+
+namespace yalahoo {
+namespace {
+// Side padding is in em units and is converted back through the glyph local scale.
+constexpr auto GlyphTotalPaddingEm = .3;
+
+constinit std::atomic<int> nodes{ 0 };
+constinit std::atomic<quint64> rebuilds{ 0 };
+constinit std::atomic<quint64> reused{ 0 };
+struct FaceNode final
+{
+    QSGTransformNode *transform = nullptr;
+    QSGClipNode *clip = nullptr;
+    QSGTextNode *text = nullptr;
+    TitleGlyph glyph;
+};
+class InkNode final : public QSGNode
+{
+    Q_DISABLE_COPY_MOVE(InkNode)
+public:
+    InkNode()
+    {
+        ++nodes;
+    }
+    ~InkNode() override
+    {
+        --nodes;
+    }
+    quint64 revision = std::numeric_limits<quint64>::max();
+    quint64 slotGeneration = 0;
+    QColor color;
+    QList<FaceNode> faces;
+};
+}
+ReelInk::ReelInk(QQuickItem *parent) : QQuickItem(parent)
+{
+    setFlag(ItemHasContents, true);
+}
+ReelSlot *ReelInk::slot() const
+{
+    return m_slot;
+}
+void ReelInk::setSlot(ReelSlot *slot)
+{
+    if (m_slot == slot)
+        return;
+    if (m_slot)
+        disconnect(m_slot, nullptr, this, nullptr);
+    m_slot = slot;
+    ++m_slotGeneration;
+    if (slot) {
+        connect(slot, &ReelSlot::contentChanged, this, &ReelInk::update);
+        connect(slot, &ReelSlot::frameChanged, this, &ReelInk::update);
+        connect(slot, &QObject::destroyed, this, [this] {
+            ++m_slotGeneration;
+            Q_EMIT slotChanged();
+            update();
+        });
+    }
+    Q_EMIT slotChanged();
+    update();
+}
+QColor ReelInk::color() const
+{
+    return m_color;
+}
+void ReelInk::setColor(const QColor &color)
+{
+    if (m_color == color)
+        return;
+    m_color = color;
+    Q_EMIT colorChanged();
+    update();
+}
+int ReelInk::liveNodes()
+{
+    return nodes;
+}
+quint64 ReelInk::geometryUpdates()
+{
+    return rebuilds;
+}
+quint64 ReelInk::geometryReuses()
+{
+    return reused;
+}
+QSGNode *ReelInk::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
+{
+    auto *node = static_cast<InkNode *>(old);
+    if (!isVisible() || !m_slot || !m_slot->shown()) {
+        delete node;
+        return nullptr;
+    }
+    if (!node)
+        node = new InkNode;
+    // Revisions are local to a slot. A different slot can carry the same revision
+    // while requiring different glyphs; keep exact-ink reuse inside reconciliation.
+    if (node->slotGeneration != m_slotGeneration || node->revision != m_slot->revision) {
+        auto previous = std::move(node->faces);
+        for (const auto &face : previous)
+            node->removeChildNode(face.transform);
+        node->faces.clear();
+        for (const auto &face : m_slot->faces) {
+            if (face.glyph.text.isEmpty() || face.glyph.colorGlyph)
+                continue;
+            const auto found =
+                    std::find_if(previous.begin(), previous.end(), [&](const auto &oldFace) {
+                        return sameGlyphInk(oldFace.glyph, face.glyph);
+                    });
+            FaceNode target;
+            const bool reusedFace = found != previous.end();
+            if (reusedFace) {
+                ++reused;
+                target = *found;
+                previous.erase(found);
+            } else {
+                target.transform = new QSGTransformNode;
+                target.clip = new QSGClipNode;
+                target.clip->setIsRectangular(true);
+                target.text = createReelTextNode(window(), face.glyph, m_color);
+                target.glyph = face.glyph;
+                target.transform->appendChildNode(target.clip);
+                target.clip->appendChildNode(target.text);
+                ++rebuilds;
+            }
+            if (reusedFace && node->color != m_color)
+                recolorReelTextNode(target.text, m_color);
+            target.clip->setClipRect(
+                    { -face.glyph.size * yalahoo::sampledReel::GlyphSidePaddingEm
+                              / face.glyph.scale,
+                      0,
+                      (m_slot->capacityWidth + face.glyph.size * GlyphTotalPaddingEm)
+                              / face.glyph.scale,
+                      face.glyph.height / face.glyph.scale });
+            node->appendChildNode(target.transform);
+            node->faces.append(target);
+        }
+        for (const auto &face : previous)
+            delete face.transform;
+        node->slotGeneration = m_slotGeneration;
+        node->revision = m_slot->revision;
+        node->color = m_color;
+    }
+    int i = 0;
+    for (const auto &face : m_slot->faces) {
+        if (face.glyph.text.isEmpty() || face.glyph.colorGlyph)
+            continue;
+        auto &target = node->faces[i++];
+        QMatrix4x4 matrix;
+        matrix.translate(float(m_slot->padding()), float(face.offset - m_slot->rollPosition()));
+        matrix.scale(float(face.glyph.scale));
+        target.transform->setMatrix(matrix);
+        if (node->color != m_color)
+            recolorReelTextNode(target.text, m_color);
+    }
+    node->color = m_color;
+    return node;
+}
+}

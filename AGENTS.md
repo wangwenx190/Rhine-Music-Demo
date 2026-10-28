@@ -1,31 +1,11 @@
-# Rhine Music Demo · 开发与发布约定
+# yalahOO!!! · 原生项目开发入口
 
-## 主线与贡献
-
-- 当前主线为 V0.4.1 macOS 本地音乐播放器，TypeScript、Three.js、Vite 与 Node.js。
-- 本仓库不接收 PR；通过 Issue 反馈问题或登记独立 Fork。规则见 CONTRIBUTING.md，社区版本见 docs/COMMUNITY-VERSIONS.md。
-- Windows 和在线专辑架由社区版本提供，不属于 V0.4.1 主线支持范围。保留历史贡献与作者署名，不改写已有 Git 历史。
-- 公开发布需要维护者明确授权。版本、下载链接、锁文件与发布说明应一致；不要自动推送或发布未经请求的版本。
-
-## 数据边界
-
-- 音乐服务仅监听 127.0.0.1，保留目录边界及 Origin / Host 校验。音乐源文件与标签只读。
-- 默认数据目录为工程旁的 music-data-v3，可用 MUSIC_DATA_DIR 覆盖。没有明确授权时，不读取私人曲库；验证使用临时目录和合成样本。
-- 不提交真实歌曲、封面缓存、索引、配置、令牌、本机个人路径或运行日志。不自动向外部资料服务查询个人曲库。
-- 私人宣传片制作内容与本地研究参考帧不随仓库或发布包分发；遵守 .gitignore 中的排除规则。
-
-## 产品与设计
-
-- 沿用现有原生实现；视觉、动效与版本行为以 DESIGN.md 和当前版本文档为准。保留减少动态效果、暖昼/深夜、横竖屏及超宽屏支持。
-- 根目录保留普通音乐启动器；演示和光照研究启动器在 tools/launchers/。
-- 播放、界面音效与氛围音乐各自独立。搜索定位不自动改变播放。
-- 真实列独立浏览并限制列内首尾；填充模式继续循环。列浏览记忆默认开启，偏好与会话记忆分开。
-- 无缝播放需音频时钟连续排程，不能用关闭淡入淡出或 HTMLAudio preload 代替。处理资源上限和过期异步操作，降级时向用户说明。
-
-## 检查与发布
-
-- Node.js 最低版本 22.12.0。使用锁文件安装依赖，运行 npm run build 及改动涉及的检查；发行回归使用 npm run check:v041。
-- 真实音频设备自动测试必须使用零音量。样本缺失应明确跳过，不能把模拟测试称为真实格式/设备验收。
-- 下载包是 macOS 源码包，不包含 node_modules、dist、缓存、私人数据或未获分发授权的参考素材。启动器应保留可执行权限。
-- 模型源文件与生成脚本继续保留；原版入口 ?original=1 依赖共享的 src、content 和 public 资源，不按音乐主页表面用途删减。
-- 保留 LICENSE、NOTICE.md、README.original.md、上游与第三方许可。代码 MIT 不自动覆盖全部图像、字体、标志、模型或声音。
+- [QT_QUICK_MIGRATION_PLAN.md](QT_QUICK_MIGRATION_PLAN.md)为项目内最高优先级契约，用户最新明确要求优先。先读公共执行/文档规则及专项索引，再读涉及主题；按当前顺序推进，完成小节直接移除，独立缺环境事项按原门槛交R36。
+- 产品范围、技术身份与目录职责唯一见[product.md](docs/contracts/product.md)；来源标识与独立原生输入见[source-provenance.md](docs/contracts/source-provenance.md)。
+- C++语言/接口、Qt对象/线程/模型和QML/C++职责分别执行[cpp23-best-practices.md](docs/contracts/cpp23-best-practices.md)、[qt-best-practices.md](docs/contracts/qt-best-practices.md)、[qml-best-practices.md](docs/contracts/qml-best-practices.md)。
+- Kit/C++23/模块闭包执行[native-bootstrap.md](docs/contracts/native-bootstrap.md)，源码格式、check-format/Release source-format和官方qmllint执行[code-style.md](docs/contracts/code-style.md)。
+- 全部QML控件执行[controls.md](docs/contracts/controls.md)的自绘强制规则；数学/结构、实际质量、功能与设备事实按[test-gates.md](docs/contracts/test-gates.md)分别证明，缺陷回归要求亦由该契约维护。
+- 性能严格静态审查及必要最小实测唯一执行[performance.md](docs/contracts/performance.md)；窗口策略及当轮可见授权唯一执行[test-window-policy.md](docs/contracts/test-window-policy.md)，授权不跨轮。
+- 歌曲/BGM/UI声音边界见[playback.md](docs/contracts/playback.md)，扫描/资料Provider见[library-data.md](docs/contracts/library-data.md)，库/搜索面板与定位见[library-ui.md](docs/contracts/library-ui.md)，设置/偏好/实例仲裁见[settings.md](docs/contracts/settings.md)。
+- 三平台源码可确定缺陷当轮修复，实际构建/部署/设备缺口只由迁移计划管理，不把暂缓记为通过。作者/许可/来源保留，不自动发布、上传私人数据、改发行标签或写用户歌曲。
+- 生成输出与Git边界执行[verification-artifacts.md](docs/contracts/verification-artifacts.md)；按明确路径暂存并检查数量/体积，不批量提交验证产物。

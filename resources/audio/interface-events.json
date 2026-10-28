@@ -1,0 +1,107 @@
+{
+    "events": [
+        {
+            "enabled": false,
+            "event": "page-open",
+            "reason": "No standalone playable short asset; original uses synthesis or embedded typing PCM. Preserve event and remain silent.",
+            "source": null
+        },
+        {
+            "enabled": false,
+            "event": "page-close",
+            "reason": "No standalone playable short asset; original uses synthesis or embedded typing PCM. Preserve event and remain silent.",
+            "source": null
+        },
+        {
+            "enabled": false,
+            "event": "ui-tick",
+            "reason": "No standalone playable short asset; original uses synthesis or embedded typing PCM. Preserve event and remain silent.",
+            "source": null
+        },
+        {
+            "enabled": false,
+            "event": "brand",
+            "reason": "No standalone playable short asset; original uses synthesis or embedded typing PCM. Preserve event and remain silent.",
+            "source": null
+        },
+        {
+            "enabled": false,
+            "event": "text-reveal",
+            "reason": "No standalone playable short asset; original uses synthesis or embedded typing PCM. Preserve event and remain silent.",
+            "source": null
+        },
+        {
+            "enabled": false,
+            "event": "key",
+            "reason": "No standalone playable short asset; original uses synthesis or embedded typing PCM. Preserve event and remain silent.",
+            "source": null
+        },
+        {
+            "enabled": false,
+            "event": "tick",
+            "reason": "No standalone playable short asset; original uses synthesis or embedded typing PCM. Preserve event and remain silent.",
+            "source": null
+        },
+        {
+            "enabled": false,
+            "event": "column",
+            "reason": "No standalone playable short asset; original uses synthesis or embedded typing PCM. Preserve event and remain silent.",
+            "source": null
+        },
+        {
+            "enabled": false,
+            "event": "open",
+            "reason": "No standalone playable short asset; original uses synthesis or embedded typing PCM. Preserve event and remain silent.",
+            "source": null
+        },
+        {
+            "enabled": false,
+            "event": "confirm",
+            "reason": "No standalone playable short asset; original uses synthesis or embedded typing PCM. Preserve event and remain silent.",
+            "source": null
+        },
+        {
+            "enabled": false,
+            "event": "back",
+            "reason": "No standalone playable short asset; original uses synthesis or embedded typing PCM. Preserve event and remain silent.",
+            "source": null
+        },
+        {
+            "enabled": false,
+            "event": "scan",
+            "reason": "No standalone playable short asset; original uses synthesis or embedded typing PCM. Preserve event and remain silent.",
+            "source": null
+        },
+        {
+            "enabled": false,
+            "event": "welcome",
+            "reason": "No standalone playable short asset; original uses synthesis or embedded typing PCM. Preserve event and remain silent.",
+            "source": null
+        },
+        {
+            "enabled": false,
+            "event": "array",
+            "reason": "No standalone playable short asset; original uses synthesis or embedded typing PCM. Preserve event and remain silent.",
+            "source": null
+        },
+        {
+            "enabled": false,
+            "event": "inspect",
+            "reason": "No standalone playable short asset; original uses synthesis or embedded typing PCM. Preserve event and remain silent.",
+            "source": null
+        },
+        {
+            "enabled": false,
+            "event": "explode",
+            "reason": "No standalone playable short asset; original uses synthesis or embedded typing PCM. Preserve event and remain silent.",
+            "source": null
+        },
+        {
+            "enabled": false,
+            "event": "assemble",
+            "reason": "No standalone playable short asset; original uses synthesis or embedded typing PCM. Preserve event and remain silent.",
+            "source": null
+        }
+    ],
+    "typingPreviewUsed": false
+}

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=yalahOO!!!
+Comment=Local music archive
+Exec=yalahoo
+Icon=yalahoo
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+StartupWMClass=yalahoo

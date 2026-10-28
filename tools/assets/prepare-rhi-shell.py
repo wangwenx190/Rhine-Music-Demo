@@ -1,0 +1,128 @@
+"""Adapt the verified R07/R08 shell mathematics to explicit RHI inputs.
+
+No source constants, optics, BRDF, PMREM, LTC or bicubic coefficients are fitted here.
+Shadow reception uses the R10A source filter; transmission always reads opaque capture.
+"""
+from pathlib import Path
+import re
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from shader_source import LIGHTING_UNIFORMS, hoist_origin_lighting, replace_identifiers
+
+root = Path(__file__).resolve().parents[2]
+directory = root / 'resources/shaders/rhi'
+source = (root / 'resources/shaders/case-glass.frag').read_text(encoding='utf-8')
+source = re.sub(r'^VARYING .*;\n', '', source, flags=re.M)
+source = source.replace('void MAIN()', 'void main()')
+source = source.replace('vec3 n = normalize(worldNormal);',
+                        'vec3 n = normalize(worldNormal);\n'
+                        '    keyShadow = lightingEnabled && dot(n, normalize(vec3(-6, 14, -5))) > 0.0\n'
+                        '            ? shadowFactor() : 1.0;')
+source = source.replace('vh = max(dot(v, h), 0.0);',
+                        'vh = max(dot(v, h), 0.0);\n'
+                        '    if (nl == 0.0)\n'
+                        '        return vec3(0);')
+source = source.replace('keyColor * lightIntensities.x',
+                        'keyColor * lightIntensities.x * keyShadow')
+source = source.replace('vec3 direct = lightingEnabled ? musicIrradiance(worldPosition, n) : paperIrradiance;',
+                        'vec3 direct = lightingEnabled ? musicIrradiance(worldPosition, n) : vec3(1);')
+source = source.replace('    FRAGCOLOR = vec4(compositorOutput ? outgoing : ACESFilmicToneMapping(outgoing), 1.0);',
+                        '    color = vec4(sceneFog(lightingEnabled ? outgoing : ACESFilmicToneMapping(outgoing), viewDepth), 1.0);\n'
+                        '    normalOut = vec4(normalize(viewNormal) * .5 + .5, 1);\n'
+                        '    depthOut = vec4(packDepth((viewDepth - f.clip.x) / (f.clip.y - f.clip.x)), 1);')
+mapping = {
+    **LIGHTING_UNIFORMS,
+    'scatterColor': 'f.scatter.xyz',
+    'scatterStrength': 'f.scatter.w',
+    'areaPosition': 'f.areaPosition.xyz',
+    'areaTarget': 'f.areaTarget.xyz',
+    'areaIntensity': 'f.areaPosition.w',
+    'CAMERA_POSITION': 'f.camera.xyz',
+    'VIEWPROJECTION_MATRIX': 'f.nativeVP',
+    'VIEW_MATRIX': 'f.view',
+    'FRAGCOORD': 'gl_FragCoord',
+    'SCREEN_MIP_TEXTURE': 'captureMap',
+    'worldPosition': 'world',
+    'lightOrigin': 'f.model[3].xyz',
+    'roughness': 'f.material.y',
+    'thickness': 'f.material.z',
+    'transmission': 'f.material.x',
+    'attenuationDistance': 'f.material.w',
+    'clearcoat': 'f.coat.x',
+    'coatRoughness': 'f.coat.y',
+    'surface': 'int(f.coat.z)',
+    'environmentIntensity': 'f.coat.w',
+    'exposure': 'f.camera.w',
+    'lightingEnabled': '(f.areaTarget.w > .5)',
+}
+source = source.replace('mix(nightTint.rgb, dayTint.rgb, warmth)', 'f.tint.rgb')
+source = source.replace('mix(nightAttenuation.rgb, dayAttenuation.rgb, warmth)', 'f.attenuation.rgb')
+a = source.index('vec3 musicShell(')
+b = source.index('float LTC_', a)
+source = source[:a] + re.sub(r'\bsurface\b', 'shellSurface', source[a:b]) + source[b:]
+# Function parameters named roughness must remain valid declarations in PMREM helpers.
+source = source.replace('float roughness)', 'float pmremRoughness)')
+a = source.index('float roughnessToMip(')
+b = source.index('float w0(', a)
+source = source[:a] + re.sub(r'\broughness\b', 'pmremRoughness', source[a:b]) + source[b:]
+source = replace_identifiers(source, mapping)
+# RhiItem evaluates immutable entity-origin terms once; local geometry terms stay in GLSL.
+source = hoist_origin_lighting(source, 'f.originLight0')
+a = source.index('    float laneDistance =')
+b = source.index('    float edgeTransport =', a)
+source = source[:a] + ('    float laneLight = f.originLight0.z;\n'
+                       '    float guided = f.originLight0.w;\n'
+                       '    float hot = f.originLight1.x;\n') + source[b:]
+source = source.replace('    if ((f.areaTarget.w > .5) && f.areaPosition.w > 0.0)\n'
+                        '        musicArea(n, v, world, r, f0, areaDiffuse, areaSpecular);',
+                        '#if AREA_ENABLED\n'
+                        '    if ((f.areaTarget.w > .5) && f.areaPosition.w > 0.0)\n'
+                        '        musicArea(n, v, world, r, f0, areaDiffuse, areaSpecular);\n'
+                        '#endif')
+a = source.index('        if (f.areaPosition.w > 0.0) {')
+b = source.index('\n        }', a) + len('\n        }')
+source = source[:a] + '#if AREA_ENABLED\n' + source[a:b] + '\n#endif' + source[b:]
+prefix = '''#version 440
+#ifndef AREA_ENABLED
+#define AREA_ENABLED 1
+#endif
+#extension GL_GOOGLE_include_directive : require
+#include "frame.glsl"
+#include "fog.glsl"
+layout(binding = 2) uniform sampler2D environmentMap;
+layout(binding = 3) uniform sampler2DShadow shadowMap;
+layout(binding = 4) uniform sampler2D captureMap;
+layout(binding = 5) uniform sampler2D dfgMap;
+layout(binding = 6) uniform sampler2D ltc1Map;
+layout(binding = 7) uniform sampler2D ltc2Map;
+layout(location = 0) centroid in vec2 paperUv;
+layout(location = 1) in vec3 world;
+layout(location = 2) in vec3 worldNormal;
+layout(location = 3) in vec3 viewNormal;
+layout(location = 4) in float viewDepth;
+layout(location = 5) in vec3 localPosition;
+layout(location = 9) in vec4 shadowCoord;
+layout(location = 0) out vec4 color;
+layout(location = 1) out vec4 normalOut;
+layout(location = 2) out vec4 depthOut;
+#include "shadow-filter.glsl"
+float keyShadow;
+'''
+# Floor and shell execute the same source LTC/GGX helpers.
+lighting_start = source.index('const float LtcNumeratorConstant')
+lighting_end = source.index('// END SHARED LIGHTING', lighting_start)
+notice = '// Derived from locked Three.js (MIT); resources/licenses/three-LICENSE.\n'
+(directory / 'shell-lighting.glsl').write_text(notice + source[lighting_start:lighting_end],
+                                               encoding='utf-8', newline='\n')
+source = source[:lighting_start] + '#include "shell-lighting.glsl"\n' + source[lighting_end:]
+(directory / 'shell-body.glsl').write_text(notice + prefix.split('\n', 1)[1] + source,
+                                           encoding='utf-8', newline='\n')
+for basic in (False, True):
+    for early in (False, True):
+        name = 'shell' + ('-basic' if basic else '') + ('-early' if early else '')
+        entry = '#version 440\n#extension GL_GOOGLE_include_directive : require\n'
+        if early:
+            entry += 'layout(early_fragment_tests) in;\n'
+        entry += '#define AREA_ENABLED ' + ('0' if basic else '1') + '\n'
+        entry += '#include "shell-body.glsl"\n'
+        (directory / (name + '.frag')).write_text(entry, encoding='utf-8', newline='\n')

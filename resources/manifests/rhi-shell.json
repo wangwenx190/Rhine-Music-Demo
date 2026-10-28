@@ -1,0 +1,119 @@
+{
+  "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
+  "uniformBytes": 752,
+  "license": "resources/licenses/three-LICENSE; resources/licenses/materials-NOTICE.md; upstream:NOTICE.md",
+  "capture": "Opaque only; explicit MSAA resolve/mips; independent sorted-shell destination",
+  "adapter": "tools/assets/prepare-rhi-shell.py: R07/R08 explicit bindings, R10A shared shadow filter; no algorithm fitting",
+  "sources": [
+    {
+      "path": "upstream:src/music-model.ts",
+      "sha256": "8531d1f1f5f40a7cc619d8b79eb9270b8afb92c154b1c47d2e5e5af5802c571a"
+    },
+    {
+      "path": "upstream:src/music-lighting.ts",
+      "sha256": "5a8d6110900ce1e1b6c7872db56e2a6030513d8565d5a1f67d4266a2704f276b"
+    },
+    {
+      "path": "upstream:src/music-row-lighting.ts",
+      "sha256": "1e7ab90893fc151896e862788804f430ffa416150bcef7f04b8388746e491294"
+    },
+    {
+      "path": "upstream:node_modules/three/src/renderers/WebGLRenderer.js",
+      "sha256": "2aa58bd0857d8fa30f7dae9c5fcf7789e896ddd029f9468a5363788efe134d83"
+    },
+    {
+      "path": "upstream:node_modules/three/src/renderers/webgl/WebGLRenderLists.js",
+      "sha256": "2e5d43a510429553486a31c41940c9451209ccba20f9a7ce4c290f93d6c6f577"
+    },
+    {
+      "path": "upstream:node_modules/three/src/renderers/webgl/WebGLShadowMap.js",
+      "sha256": "7d69ca09821ed119d7e1db25e88ad43c2b8c7dd87e8746e1c63f8b86086b3e05"
+    },
+    {
+      "path": "upstream:package-lock.json",
+      "sha256": "8a6e407ebfb21ee023310aeb226070f9b7ecfdc014c6120ee7c961cc2aeec904"
+    },
+    {
+      "path": "resources/shaders/case-glass.frag",
+      "sha256": "1e937871b8aaf273c9c93b120e9d927f5d9c84bfef61904d28cc89b7661bfa7b"
+    },
+    {
+      "path": "resources/shaders/album-paper.frag",
+      "sha256": "1619de8d0926f82e99c985b5e35b4d581c1bd59fad4310e2579e1c2cd3dbf344"
+    },
+    {
+      "path": "tests/application/qml/scene/GlassMaterial.qml",
+      "sha256": "9b3d59b0b13c62d0d85c387081b3105e6af8f81b5307b0193c3ab36fb40da995"
+    },
+    {
+      "path": "resources/models/music-case-v040.glb",
+      "sha256": "7bbee4f485c58e0506e4ab53711c250a1e68bcd38f2a2ea81e6e68b4574b8a16"
+    },
+    {
+      "path": "resources/environment/room-pmrem.rgba32f",
+      "sha256": "5693c5a0eb2ea0d2d89b1a982818d6b9c8d234c6bfba6fbcdcfcc9b753634d02"
+    },
+    {
+      "path": "resources/environment/dfg.rgba32f",
+      "sha256": "398473a15fa8a98b4b8399af095510410dbd96e5ac9d886bb17f35cc48bf76dc"
+    },
+    {
+      "path": "resources/environment/ltc1.rgba32f",
+      "sha256": "cf5cf21e5c112d2095c7e2418cb0a1ac54636e275d73e42f3453646c67f26814"
+    },
+    {
+      "path": "resources/environment/ltc2.rgba32f",
+      "sha256": "3b1b09080b26104498db277c14fc1733786465c6958e7a8403d688b1e24c2ff5"
+    }
+  ],
+  "fixedOptics": {
+    "ior": 1.46,
+    "environmentScale": 1.01,
+    "attenuationScale": 1.0201,
+    "roughnessScale": 1.01,
+    "thicknessScale": 0.91809
+  },
+  "round": "R10B",
+  "shaders": [
+    {
+      "path": "resources/shaders/rhi/frame.glsl",
+      "sha256": "45729ab2fb03b3c82a6dd7eea9368f2af51f8c8d18fbe7bd4489deeaa32137e0"
+    },
+    {
+      "path": "resources/shaders/rhi/geometry.vert",
+      "sha256": "c7e9a7b0aa72566ca97a6df568a80fe24f3809e2c3a47d5079a15e9d8ef668a2"
+    },
+    {
+      "path": "resources/shaders/rhi/opaque.frag",
+      "sha256": "83f300d15e7ca40b9c8bf0acaab432e4e1a372367cefeaa013a97e56812261f3"
+    },
+    {
+      "path": "resources/shaders/rhi/output.frag",
+      "sha256": "537cd0b6570acb7190176ef38fbc5a5adde8b6c8bcaa1fd6bc21b16e7f733efd"
+    },
+    {
+      "path": "resources/shaders/rhi/output.vert",
+      "sha256": "fab1bd7f5921bc1fb75d96e6b9e932d5da82edb1a89b33b4af6fdd9f325b0376"
+    },
+    {
+      "path": "resources/shaders/rhi/paper-lighting.glsl",
+      "sha256": "e4e285cc9f53e4cc8b76b86f93a2843431a925dbdc018a19b381a5b23b436a05"
+    },
+    {
+      "path": "resources/shaders/rhi/shadow-filter.glsl",
+      "sha256": "f84ecb0bad7717f9354a1d44dcf891d21a8b3226a10eb076f61acbc8dc7db875"
+    },
+    {
+      "path": "resources/shaders/rhi/shadow.frag",
+      "sha256": "7051be9ad7c8bbc13bc7f2d436a5eb4719848c15c56dc3067504a978b424dad2"
+    },
+    {
+      "path": "resources/shaders/rhi/shadow.vert",
+      "sha256": "a83c10dac7eb512b07a6f9c2a87cee7b954f486045cc225aca8c39d34474c63f"
+    },
+    {
+      "path": "resources/shaders/rhi/shell.frag",
+      "sha256": "80562d5c4185d1b26a17e9501deba96d7f1d990e7dc6b87715ac69e623fa02a7"
+    }
+  ]
+}

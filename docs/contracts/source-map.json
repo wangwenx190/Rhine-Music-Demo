@@ -1,0 +1,1073 @@
+{
+  "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
+  "entry": "src/main.ts → src/music-app.ts (without original=1)",
+  "modules": [
+    {
+      "baselinePath": "src/appearance.ts",
+      "sha256": "8ad730b12e7b71f61c8ca055728f09b9b6133511431efa554580db319ed359fb",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/OpticalParameters.h + src/render/SourceOptics.h",
+      "responsibility": "Continuous source material parameters and Review optics",
+      "imports": [
+        "src/glass-reveal.ts",
+        "src/internal-optics.ts",
+        "src/music-model.ts",
+        "src/theme-transition.ts",
+        "src/music-lighting.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/archive-lighting.ts",
+      "sha256": "fc14af44039728419a0338770e13774697b6eea20ce61abc59e76b99f0c0d349",
+      "musicReachable": true,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/archive-loop.ts",
+      "sha256": "c9988492f7b2391a23cd6b7bdfb4be51d6990d50e901c7a68960ad4e7b58ac4b",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/ArchivePool.cpp + src/render/SelectionController.cpp + src/render/ArchiveField.cpp",
+      "responsibility": "Bounded array and selection field",
+      "imports": [
+        "src/data.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/archive-main.ts",
+      "sha256": "370c84cdf5f648f8d8421b292fe5b50b521838aa94d0c46670d97de1bfb36b72",
+      "musicReachable": false,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": [
+        "src/inspection-overlay.ts",
+        "src/document-decryption.ts",
+        "src/document-decryption.css",
+        "src/decryption.css",
+        "src/html.ts",
+        "src/render-quality.ts",
+        "src/quality-settings.ts",
+        "src/style.css",
+        "src/quality-settings.css",
+        "src/responsive.css",
+        "src/viewport-layout.ts",
+        "src/asset-url.ts",
+        "src/pwa.ts",
+        "src/scene.ts",
+        "src/model-viewer.ts",
+        "src/ui-transitions.ts",
+        "src/boot.ts",
+        "src/archive-loop.ts",
+        "src/data.ts",
+        "src/audio.ts",
+        "src/audio-settings.ts",
+        "src/brand.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/asset-url.ts",
+      "sha256": "d8eebd5c0b08d9541cc6aa92e7bc4f492b3cc69626e298cd1f74fed72ce1ce4d",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "resources/branding/ + src/app/AssetCatalog.cpp",
+      "responsibility": "Embedded assets and native product branding",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/audio-settings.ts",
+      "sha256": "11bebafaef198f9a6b90072c48e1f07a1af81df6115a5a96bdad2e98185c0edb",
+      "musicReachable": false,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": [
+        "src/audio.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/audio.ts",
+      "sha256": "75931d7194ec6cb8e7d09f85f4269e76c83b2c70b0e2bcd7a6652998a37fa3c8",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/media/InterfaceSoundController.cpp",
+      "responsibility": "Independent event sound routing with available embedded assets",
+      "imports": [
+        "src/typing-rhythm.ts",
+        "src/typing-samples.ts",
+        "src/asset-url.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/boot-logo-tracks.ts",
+      "sha256": "dd1ea3e2162af2f88818099a5539ed092f1aaccf47d7a3f1b04ef80e2a887405",
+      "musicReachable": true,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": [
+        "src/boot-tracks.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/boot-motion.ts",
+      "sha256": "047d768d1952c83abe1a8352a859fb31aac09751f176975c1174885587597bdd",
+      "musicReachable": true,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": [
+        "src/boot-tracks.ts",
+        "src/boot-orbit-tracks.ts",
+        "src/boot-logo-tracks.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/boot-orbit-tracks.ts",
+      "sha256": "179285daf9f62ebcd4da2a33fb7b5ae6da92c900714cd91c5aafdda58927a953",
+      "musicReachable": true,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": [
+        "src/boot-tracks.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/boot-tracks.ts",
+      "sha256": "6d6fd116d22a27b96899d692656af904a9f18d7406f44ebec0417cf3acd0141e",
+      "musicReachable": true,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/boot.ts",
+      "sha256": "9b30d7aeba48f65f01a769a9fc1517e589ce92ff534618be60b1430985d056a6",
+      "musicReachable": false,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": [
+        "src/boot-motion.ts",
+        "src/brand.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/brand.ts",
+      "sha256": "36f88bda7e6d92338245581613585a75c58982669a30a5751bf8f6614143525a",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "resources/branding/ + src/app/AssetCatalog.cpp",
+      "responsibility": "Embedded assets and native product branding",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/cover-atlas.ts",
+      "sha256": "db618e47e44f9e3a4197e26d297345b3693ce5ff7067608f9966be3bc5b75910",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/services/CoverCache.cpp + src/render/rhi/AtlasAllocator.cpp + src/render/rhi/AtlasUpload.cpp",
+      "responsibility": "Artwork decode, bounded leases and incremental atlas upload",
+      "imports": [
+        "src/music-lighting.ts",
+        "src/data.ts",
+        "src/music-model.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/data.ts",
+      "sha256": "e926df209d9785af868137f291e5377cc9ab89102f8dc3aeb188471bb0955438",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/services/LibrarySession.cpp",
+      "responsibility": "Immutable library publication and independent navigation identity",
+      "imports": [
+        "src/music-types.ts",
+        "src/music-order.ts",
+        "src/music-order.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/decryption.css",
+      "sha256": "ea95ab1ccb18fbbec6884d5b22a4297bd3a46ab4ac3b68e8258122fbe4f3d45d",
+      "musicReachable": true,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/decryption.ts",
+      "sha256": "e0ad3554df74d8b0cc8ca8e84f2084e842d60824a5b6177daea9b81804684ec1",
+      "musicReachable": true,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/demo-library.ts",
+      "sha256": "20ad845ddd61f95709c41380c742ac8ff82a9859a59439b79f0313d8a25581bf",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/services/DemoLibrary.cpp",
+      "responsibility": "Anonymous product demonstration library",
+      "imports": [
+        "src/music-types.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/document-decryption.css",
+      "sha256": "6a5545f2dc733a2ec2ea241fe8be9575ae2c07355f5a06438ff7414687aecb9b",
+      "musicReachable": true,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/document-decryption.ts",
+      "sha256": "3a57fc803d3d58614779708a84e33b9ef9ddc8764516e9d2822799111e100b7e",
+      "musicReachable": true,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": [
+        "src/decryption.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/glass-reveal.ts",
+      "sha256": "26a16d2b4ad9447390f53e0956b8691001e12182827e68a713e9cb40598db513",
+      "musicReachable": true,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/html.ts",
+      "sha256": "2ba5ade6bdeef34d5328844bf2b4190c3cefe3d81f90cc78e85ea0abd81d2fad",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "qml/Yalahoo/Music/components/ + qml/Yalahoo/Music/pages/",
+      "responsibility": "Responsive layout, explicit controls and typography",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/inspection-overlay.ts",
+      "sha256": "384d21c258c26b6427f74850abb1b2c36c6c0873d307d39f2c390f5f0411db62",
+      "musicReachable": false,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": [
+        "src/decryption.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/internal-optics.ts",
+      "sha256": "51001ae8df1a5050fb14214058ff21e7a957b0dc5e97207eb8e87c6b2ffddc21",
+      "musicReachable": true,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/main.ts",
+      "sha256": "4f27f6c6071e3c9512b38e65371a3ebc69236b3f58478bed8fdb226953588253",
+      "musicReachable": false,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": [
+        "src/archive-main.ts",
+        "src/music-app.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/model-viewer.ts",
+      "sha256": "0e2defe9712ddfb42b0cafa1112a2f4a8ff388718091451b4f31410e7f4897e3",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/rhi/ + src/render/SceneAdapter.cpp + src/render/RenderQuality.cpp",
+      "responsibility": "Production RHI geometry, material, light field and postprocessing",
+      "imports": [
+        "src/archive-lighting.ts",
+        "src/motion.ts",
+        "src/viewer-camera.ts",
+        "src/viewer-album-cover.ts",
+        "src/music-model.ts",
+        "src/music-types.ts",
+        "src/viewer-theme.ts",
+        "src/render-quality.ts",
+        "src/quality-renderer.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/motion.ts",
+      "sha256": "b13b92382dd4005eb17a8680902f33feff03e5195beaa9d5bc2b309d4d82f602",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/motion/",
+      "responsibility": "Shared clock, analytical springs and quintic tracks",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/music-app.ts",
+      "sha256": "582195eda922d9ef4648e65ac9d0d644e4edfd6e59ecc38abef9d6ee2e26fb15",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/app/ApplicationRuntime.cpp + qml/Yalahoo/Music/App.qml + qml/Yalahoo/Music/pages/MusicStage.qml",
+      "responsibility": "Native composition, controller ownership and visual lifecycle",
+      "imports": [
+        "src/style.css",
+        "src/quality-settings.css",
+        "src/document-decryption.css",
+        "src/decryption.css",
+        "src/music.css",
+        "src/music-navigation-motion.css",
+        "src/music-navigation-ruler.css",
+        "src/music-transport-title.css",
+        "src/music-theme.css",
+        "src/music-theme-switch.css",
+        "src/music-overview.css",
+        "src/music-overview-ui.ts",
+        "src/music-array-layout.ts",
+        "src/document-decryption.ts",
+        "src/ui-transitions.ts",
+        "src/quality-settings.ts",
+        "src/scene.ts",
+        "src/data.ts",
+        "src/archive-loop.ts",
+        "src/render-quality.ts",
+        "src/music-player.ts",
+        "src/music-song-transition.ts",
+        "src/model-viewer.ts",
+        "src/audio.ts",
+        "src/music-types.ts",
+        "src/demo-library.ts",
+        "src/html.ts",
+        "src/music-title.ts",
+        "src/music-text-motion.ts",
+        "src/music-transport-title.ts",
+        "src/music-ticks.ts",
+        "src/music-ruler.ts",
+        "src/music-presentation.ts",
+        "src/music-track-focus.ts",
+        "src/music-boot.ts",
+        "src/music-frame-timing.ts",
+        "src/music-search.ts",
+        "src/viewport-layout.ts",
+        "src/music-lighting-lab.ts",
+        "src/music-lighting-lab.ts",
+        "src/music-motion-lab.ts",
+        "src/music-motion-settings.ts",
+        "src/music-wheel-navigation.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-archive-motion.ts",
+      "sha256": "db114c34c6da3bba3389d72ef7d4f949c5a47902e7ee09d020bbd109d4b0f91b",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/motion/MotionController.cpp + src/motion/QuinticTrack.cpp",
+      "responsibility": "Source archive quintic travel and C2 retargeting",
+      "imports": [
+        "src/motion.ts",
+        "src/archive-loop.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-array-layout.ts",
+      "sha256": "772d89e5ec58fb90c62c625005739385948593f0ee1a8ce12a223c31f2e8f4fb",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/ArchivePool.cpp + src/render/RealColumns.cpp",
+      "responsibility": "Real cell admission and column overview offsets",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/music-boot-timing.ts",
+      "sha256": "cb54c4691883d28e4c8a10eac311bb2ae7351880e789b51439189e91f7e1d572",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/opening/ + src/render/StartupCoordinator.cpp + qml/Yalahoo/Music/pages/Opening.qml",
+      "responsibility": "Native opening, readiness and interaction handoff",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/music-boot.css",
+      "sha256": "62be2673881999be42e02e7ccaeddc4a9bdd0867a6a93d742e57d10bd3a4b454",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/opening/ + src/render/StartupCoordinator.cpp + qml/Yalahoo/Music/pages/Opening.qml",
+      "responsibility": "Native opening, readiness and interaction handoff",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/music-boot.ts",
+      "sha256": "1efb113442aa08b77a214886524ddc769815cf2a45ba14eff20edc211420cc36",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/opening/ + src/render/StartupCoordinator.cpp + qml/Yalahoo/Music/pages/Opening.qml",
+      "responsibility": "Native opening, readiness and interaction handoff",
+      "imports": [
+        "src/music-boot.css",
+        "src/music-boot-timing.ts",
+        "src/music-opening.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-browser-gapless.ts",
+      "sha256": "dbe0b5928403f6eaa4b7079c8ed1f36fd9760b686c20c82244126d5d086f1a63",
+      "musicReachable": true,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": [
+        "src/music-types.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-camera.ts",
+      "sha256": "b53b26014bdc362d16c87d3e9709e1c0be4dc4217edff289e9db315fcba19faf",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/CameraFraming.h + src/render/SceneAdapter.cpp + src/render/DetailMotion.cpp",
+      "responsibility": "Source camera framing and placement motion",
+      "imports": [
+        "src/motion.ts",
+        "src/viewport-layout.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-cd-asset.ts",
+      "sha256": "eb072d8c9843a24aaf62f2ef0b09bd25a730314e501035b0b2c4492672054b56",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "resources/models/music-case-v040.glb + src/render/rhi/PreparedAssets.cpp",
+      "responsibility": "Frozen model resource and native geometry loading",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/music-frame-timing.ts",
+      "sha256": "99dd7827642f178f9836fd182f9bebaf4edcb02a05ff491455964e7c5029c3c5",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/motion/FrameClock.cpp",
+      "responsibility": "Single frame source and raw/motion time separation",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/music-lighting-lab.css",
+      "sha256": "520f28459b2b2ebbdb672a25a86a0165d265be61961308d7f317531619757881",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/SettingsController.cpp + src/services/PreferencesStore.cpp + qml/Yalahoo/Music/panels/",
+      "responsibility": "Persistent settings and native self-drawn panels",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/music-lighting-lab.ts",
+      "sha256": "8e2bded0e632623892253695f28484765868ace90a9401d4e28f97941465f652",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/SelectionLighting.cpp + src/render/RowLightController.cpp + qml/Yalahoo/Music/panels/LightingPanel.qml",
+      "responsibility": "Confirmed and temporary lighting controls and source world light field",
+      "imports": [
+        "src/music-lighting-lab.css",
+        "src/music-row-lighting.ts",
+        "src/music-row-lighting.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-lighting.ts",
+      "sha256": "5a8d6110900ce1e1b6c7872db56e2a6030513d8565d5a1f67d4266a2704f276b",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/SelectionLighting.cpp + resources/shaders/lighting-field.glsl",
+      "responsibility": "Source world lighting and theme palette",
+      "imports": [
+        "src/music-model.ts",
+        "src/theme-transition.ts",
+        "src/music-row-lighting.ts",
+        "src/music-row-lighting.ts",
+        "src/music-row-lighting.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-model.ts",
+      "sha256": "8531d1f1f5f40a7cc619d8b79eb9270b8afb92c154b1c47d2e5e5af5802c571a",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/core/SceneGeometry.h + src/render/OpticalParameters.h + src/render/rhi/ShellMaterial.cpp",
+      "responsibility": "Model geometry and continuous source optical parameters",
+      "imports": [
+        "src/theme-transition.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-motion-lab.ts",
+      "sha256": "0bbb655612a435ea4f96b6ed6a0382c9bbb64edb1b20fd31abaf68275174d2c8",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/motion/MotionController.cpp + src/render/SettingsController.cpp + qml/Yalahoo/Music/panels/MotionPanel.qml",
+      "responsibility": "Motion speed and reduced-motion settings",
+      "imports": [
+        "src/music-lighting-lab.css",
+        "src/music-motion-settings.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-motion-settings.ts",
+      "sha256": "67708bcdf2d7fe9ce82acfe6424aa94d6f21fd3b755f0583857ddcc831d481d7",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/motion/MotionController.cpp + src/render/SettingsController.cpp + qml/Yalahoo/Music/panels/MotionPanel.qml",
+      "responsibility": "Motion speed and reduced-motion settings",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/music-motion-ui.ts",
+      "sha256": "33ef6e5af89c00df6b64d578b2fa89ea1e73836b7ff3f6ef6c18d8142ed7fd20",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/motion/",
+      "responsibility": "Shared clock, analytical springs and quintic tracks",
+      "imports": [
+        "src/music-motion-settings.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-navigation-motion.css",
+      "sha256": "f9cefb637ae2ebfeb18bcc2051cb2197702313d71e5d0b02ec6cfef1e2fade95",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/navigation/ + qml/Yalahoo/Music/components/NavigationFrame.qml + qml/Yalahoo/Music/components/Ruler.qml",
+      "responsibility": "Source navigation mathematics, input routing and C++ Canvas ruler",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/music-navigation-ruler.css",
+      "sha256": "584395ad4e4af095a04e25948ea71151d41f92cde63d15dfe9efb30ce3145688",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/navigation/ + qml/Yalahoo/Music/components/NavigationFrame.qml + qml/Yalahoo/Music/components/Ruler.qml",
+      "responsibility": "Source navigation mathematics, input routing and C++ Canvas ruler",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/music-opening.ts",
+      "sha256": "432087270b0b27b718cb05923f667f285da5a6ba2a4c3cd58e29ad2abf3d883b",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/opening/ + src/render/StartupCoordinator.cpp + qml/Yalahoo/Music/pages/Opening.qml",
+      "responsibility": "Native opening, readiness and interaction handoff",
+      "imports": [
+        "src/brand.ts",
+        "src/music-boot-timing.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-order.ts",
+      "sha256": "b89dbb47c83718a940099738dc3c0600897a39848937687e4cc8c86b324028c0",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/core/LibraryOrder.cpp + src/core/AlbumListModel.cpp",
+      "responsibility": "Cached ordering, grouping and album model",
+      "imports": [
+        "src/music-types.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-overview-edge.ts",
+      "sha256": "1c4a48bc91a9e737eeb33f7bf5414cc9bc9e14c2ff91c9fc6dc63484f0924cf3",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/OverviewController.cpp + src/render/OverviewLabelsModel.cpp + qml/Yalahoo/Music/pages/Overview.qml",
+      "responsibility": "Overview framing, folding, labels and interaction",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/music-overview-ui.ts",
+      "sha256": "69667f5e8506025f94a24a57ed02b7b3aee88b29745398ef683ca34bdf5a32b5",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/OverviewController.cpp + src/render/OverviewLabelsModel.cpp + qml/Yalahoo/Music/pages/Overview.qml",
+      "responsibility": "Overview framing, folding, labels and interaction",
+      "imports": [
+        "src/music-overview.ts",
+        "src/ui-transitions.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-overview.css",
+      "sha256": "f8573072fd8a547a36dc21029ec3df5746e2a35d57fda0e535d770370260d6fd",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/OverviewController.cpp + src/render/OverviewLabelsModel.cpp + qml/Yalahoo/Music/pages/Overview.qml",
+      "responsibility": "Overview framing, folding, labels and interaction",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/music-overview.ts",
+      "sha256": "e2951987849f5e33603f9aef9a3cdf10715dc8cf038a3c9da5c4fb413f35c156",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/OverviewController.cpp + src/render/OverviewLabelsModel.cpp + qml/Yalahoo/Music/pages/Overview.qml",
+      "responsibility": "Overview framing, folding, labels and interaction",
+      "imports": [
+        "src/motion.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-player.ts",
+      "sha256": "629e290d9ea0d8608f711e4a6c34d520fe5fff30c33432039d0fe8b1fb31d2a6",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/media/PlaybackController.cpp",
+      "responsibility": "Public QtMultimedia song playback and retained album queue",
+      "imports": [
+        "src/music-types.ts",
+        "src/music-song-transition.ts",
+        "src/music-browser-gapless.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-presentation.ts",
+      "sha256": "292d974d9b21d19355548aafac53c1dbaeb0340b0f0b8a083eb871cf51496d09",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/presentation/ + qml/Yalahoo/Music/pages/Detail.qml + qml/Yalahoo/Music/components/TrackList.qml",
+      "responsibility": "Detail content, navigation and virtualized track focus",
+      "imports": [
+        "src/archive-loop.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-real-columns.ts",
+      "sha256": "39039159a5f1540f437b2c0164ba1ed483bd4eebd89c00752ea5744d93e80b87",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/RealColumns.cpp + src/render/ColumnMemory.cpp",
+      "responsibility": "Finite columns and session position memory",
+      "imports": [
+        "src/archive-loop.ts",
+        "src/music-archive-motion.ts",
+        "src/motion.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-row-lighting.ts",
+      "sha256": "1e7ab90893fc151896e862788804f430ffa416150bcef7f04b8388746e491294",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/SelectionLighting.cpp + src/render/RowLightController.cpp + qml/Yalahoo/Music/panels/LightingPanel.qml",
+      "responsibility": "Confirmed and temporary lighting controls and source world light field",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/music-ruler.ts",
+      "sha256": "cf86b6fbd258ba6d70918746c6e4ec1518a0b39f135ebfe6d24558ed2fa0ff51",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/navigation/ + qml/Yalahoo/Music/components/NavigationFrame.qml + qml/Yalahoo/Music/components/Ruler.qml",
+      "responsibility": "Source navigation mathematics, input routing and C++ Canvas ruler",
+      "imports": [
+        "src/archive-loop.ts",
+        "src/music-motion-settings.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-search.ts",
+      "sha256": "77d317688e2739682c721d1bbf6081a1620a5461a305851fcc188b230539761b",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/core/LibraryOrder.cpp + src/core/SearchListModel.cpp + src/core/LibraryIndex.cpp",
+      "responsibility": "Indexed asynchronous search and stable result models",
+      "imports": [
+        "src/music-types.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-song-transition.ts",
+      "sha256": "0516cb3048fe8836ce818103098a7d999505105d0f8cacfc4db914e709e93897",
+      "musicReachable": true,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/music-text-motion.ts",
+      "sha256": "571c64d9c211edfd7127f7b76005757d8ba80d8e17bb3a36c552581473b2bb20",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/text/ + qml/Yalahoo/Music/components/TitleReel.qml + qml/Yalahoo/Music/components/TransportTitle.qml",
+      "responsibility": "Shaped glyph and color text, bounded reels and shared-clock transport motion",
+      "imports": [
+        "src/archive-loop.ts",
+        "src/music-motion-settings.ts",
+        "src/music-motion-ui.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-theme-switch.css",
+      "sha256": "e4869a59772ce4a77071bb3b9d333e20de720569d94b2c7b6ee91049a8bd06fc",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/SettingsController.cpp + src/services/PreferencesStore.cpp + qml/Yalahoo/Music/panels/",
+      "responsibility": "Persistent settings and native self-drawn panels",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/music-theme.css",
+      "sha256": "ae288919521686d10f523284e419839ff095a774ee238e0efd1aea370cb0ae3d",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/SettingsController.cpp + src/services/PreferencesStore.cpp + qml/Yalahoo/Music/panels/",
+      "responsibility": "Persistent settings and native self-drawn panels",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/music-ticks.ts",
+      "sha256": "8a82db400b248c8d107129e0ed452caa9bdadce7537272c164c02b7c0027bdad",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/navigation/ + qml/Yalahoo/Music/components/NavigationFrame.qml + qml/Yalahoo/Music/components/Ruler.qml",
+      "responsibility": "Source navigation mathematics, input routing and C++ Canvas ruler",
+      "imports": [
+        "src/music-motion-ui.ts",
+        "src/archive-loop.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-title-reels.ts",
+      "sha256": "b6112370d3fd44d4ee2ba911988df91386054edd6a91e670c69fd3bc53edde7a",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/text/ + qml/Yalahoo/Music/components/TitleReel.qml + qml/Yalahoo/Music/components/TransportTitle.qml",
+      "responsibility": "Shaped glyph and color text, bounded reels and shared-clock transport motion",
+      "imports": [
+        "src/music-motion-ui.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-title.ts",
+      "sha256": "62f44974a06d0b108ded1ce73755a77f67540d4b07cdddd3ad52b6a4c06f8b63",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/text/ + qml/Yalahoo/Music/components/TitleReel.qml + qml/Yalahoo/Music/components/TransportTitle.qml",
+      "responsibility": "Shaped glyph and color text, bounded reels and shared-clock transport motion",
+      "imports": [
+        "src/html.ts",
+        "src/music-title-reels.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-track-focus.ts",
+      "sha256": "9b40987d496c0717e9e9efcabc20226ec42add9a04b183a6e818c8ba34dd91e9",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/presentation/TrackFocusController.cpp + qml/Yalahoo/Music/components/TrackList.qml",
+      "responsibility": "Stable track reveal, scrolling and focus",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/music-transport-title.css",
+      "sha256": "7f4e284fb1593a91de00acc2f6a51d1b77c61728fe25212fcfb41ce28b77855b",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/text/ + qml/Yalahoo/Music/components/TitleReel.qml + qml/Yalahoo/Music/components/TransportTitle.qml",
+      "responsibility": "Shaped glyph and color text, bounded reels and shared-clock transport motion",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/music-transport-title.ts",
+      "sha256": "bc73203ea42d44e4e2a119b47183bcfe9663b9a55eaeeabf7112a911ac607301",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/text/ + qml/Yalahoo/Music/components/TitleReel.qml + qml/Yalahoo/Music/components/TransportTitle.qml",
+      "responsibility": "Shaped glyph and color text, bounded reels and shared-clock transport motion",
+      "imports": [
+        "src/music-motion-settings.ts",
+        "src/music-motion-ui.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/music-types.ts",
+      "sha256": "e5f57bdd2088ea70012dd5377f0a41e13d6faa147dda5b724f9a3fb08ad40d03",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/core/MusicTypes.h",
+      "responsibility": "Library values and serialization",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/music-wheel-navigation.ts",
+      "sha256": "0f2f84741cf88f17e671f9b262d01efa1b486b4c6fb4214e00ffd64cee99a71a",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/navigation/ + qml/Yalahoo/Music/components/NavigationFrame.qml + qml/Yalahoo/Music/components/Ruler.qml",
+      "responsibility": "Source navigation mathematics, input routing and C++ Canvas ruler",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/music.css",
+      "sha256": "b12a65cfe1a6571ea7eacfe5cca6d0cd945abb1935423b639084764a38d5f2ba",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "qml/Yalahoo/Music/components/ + qml/Yalahoo/Music/pages/",
+      "responsibility": "Responsive layout, explicit controls and typography",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/pwa.ts",
+      "sha256": "a8519c3c89f0d1b7680178c9946e9b51feb6c03a49a55b3ce34b19240c0ac5b0",
+      "musicReachable": false,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": [
+        "src/asset-url.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/quality-renderer.ts",
+      "sha256": "9c0dcc4c6ce011a147701b0c52100b93cec18cfe5732f09581e8b70d6f9d2a35",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/rhi/ + src/render/SceneAdapter.cpp + src/render/RenderQuality.cpp",
+      "responsibility": "Production RHI geometry, material, light field and postprocessing",
+      "imports": [
+        "src/render-quality.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/quality-settings.css",
+      "sha256": "ef3398d7ee3ce5906cb954a4f6ddc53f0eae2547e5c4daa2249e2c096df1090b",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/SettingsController.cpp + src/services/PreferencesStore.cpp + qml/Yalahoo/Music/panels/",
+      "responsibility": "Persistent settings and native self-drawn panels",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/quality-settings.ts",
+      "sha256": "df6a16ca5af38a6b781ec9c060bb70924c6bdd6fedb660e1d74c9b8dd3e7600b",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/SettingsController.cpp + src/services/PreferencesStore.cpp + qml/Yalahoo/Music/panels/",
+      "responsibility": "Persistent settings and native self-drawn panels",
+      "imports": [
+        "src/render-quality.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/render-quality.ts",
+      "sha256": "862758c9e4c1c272ba10f44c2c58746b53b62ac42d2d7d8776eca0fc349118de",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/rhi/ + src/render/SceneAdapter.cpp + src/render/RenderQuality.cpp",
+      "responsibility": "Production RHI geometry, material, light field and postprocessing",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/responsive.css",
+      "sha256": "546acab421894ad5bdfad9553a8942abbe756ff965a6cb87816bec4b8a655f83",
+      "musicReachable": false,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/scene.ts",
+      "sha256": "cd212bd9a40ea2323e21ad3008a025dd5a5874cb5d095f53375986122743d541",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/rhi/ + src/render/SceneAdapter.cpp + src/render/RenderQuality.cpp",
+      "responsibility": "Production RHI geometry, material, light field and postprocessing",
+      "imports": [
+        "src/archive-lighting.ts",
+        "src/render-quality.ts",
+        "src/quality-renderer.ts",
+        "src/appearance.ts",
+        "src/internal-optics.ts",
+        "src/decryption.ts",
+        "src/data.ts",
+        "src/cover-atlas.ts",
+        "src/music-lighting.ts",
+        "src/music-camera.ts",
+        "src/music-archive-motion.ts",
+        "src/music-real-columns.ts",
+        "src/music-overview-edge.ts",
+        "src/music-cd-asset.ts",
+        "src/music-model.ts",
+        "src/archive-loop.ts",
+        "src/brand.ts",
+        "src/viewport-layout.ts",
+        "src/asset-url.ts",
+        "src/theme-transition.ts",
+        "src/music-motion-settings.ts",
+        "src/music-overview.ts",
+        "src/music-array-layout.ts",
+        "src/motion.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/style.css",
+      "sha256": "0c09becc25cfedbe5b0d76ead8d57fe7780e760cb78af31e33712d809d40cbba",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "qml/Yalahoo/Music/components/ + qml/Yalahoo/Music/pages/",
+      "responsibility": "Responsive layout, explicit controls and typography",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/theme-transition.ts",
+      "sha256": "7b59fdda7586195d9e1d26eb38073ecfe645279b197b127bdd61bfa2e0d52344",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/SelectionLighting.cpp",
+      "responsibility": "Continuous source theme interpolation",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/typing-rhythm.ts",
+      "sha256": "842c6995bf85743210b82f0186770afacc9a0418bce7fe79acde8e2058ee0cf6",
+      "musicReachable": true,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": [
+        "src/boot-motion.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/typing-samples.ts",
+      "sha256": "c3692433e5dd34dc4b65b78b149932ee6132250c0120254f996a4a9ec94599a8",
+      "musicReachable": true,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/ui-transitions.ts",
+      "sha256": "df264429e7c7d1116c43aa63c9eddd1077dc9a687b77ff71078e0711563135cd",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/presentation/SurfaceTransition.cpp",
+      "responsibility": "Shared-clock interruptible surface transitions",
+      "imports": [
+        "src/music-motion-ui.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/viewer-album-cover.ts",
+      "sha256": "1a23430185d665bea455540b90b286197a732bc41d10cb642c522c27a5b3f265",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/services/CoverCache.cpp + resources/shaders/rhi/cover-sampling.glsl",
+      "responsibility": "Contain artwork and isolated linear-light filtering",
+      "imports": [
+        "src/cover-atlas.ts",
+        "src/music-types.ts",
+        "src/music-model.ts"
+      ]
+    },
+    {
+      "baselinePath": "src/viewer-camera.ts",
+      "sha256": "b64a944133caaa2aabba70def79dd532530d3b9f8ce6ae0738f11d54576f4d08",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/SceneAdapter.cpp",
+      "responsibility": "Scene frame and analytical camera transitions",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/viewer-theme.ts",
+      "sha256": "caca1f5acb9c7f9f08a3e1038f67958b645ba498bcc0b458c909c7e9dd639a55",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/SelectionLighting.cpp + src/render/OpticalParameters.h",
+      "responsibility": "Source palette and material colors",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/viewport-layout.ts",
+      "sha256": "79401f55975f13af2233d8f8ab81edbe17478e01db49767462d3e9ebfedefe8a",
+      "musicReachable": true,
+      "role": "migrate",
+      "target": "src/render/LayoutMetrics.cpp",
+      "responsibility": "Responsive logical viewport and source camera geometry",
+      "imports": []
+    },
+    {
+      "baselinePath": "src/vite-env.d.ts",
+      "sha256": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5",
+      "musicReachable": false,
+      "role": "reference-only",
+      "target": null,
+      "responsibility": "Frozen reference only; no native product implementation",
+      "imports": []
+    }
+  ],
+  "services": [
+    {
+      "sourcePath": "upstream:scripts/album-introductions.mjs",
+      "target": "src/services/metadata/MetadataWorker.cpp + src/services/metadata/WikipediaSource.cpp",
+      "policy": "Explicitly authorized Wikipedia/Wikidata queries with attributed offline cache"
+    },
+    {
+      "sourcePath": "upstream:scripts/archive-content.mjs",
+      "target": null,
+      "policy": "Frozen Web tooling only; no native product service"
+    },
+    {
+      "sourcePath": "upstream:scripts/launch-music.mjs",
+      "target": null,
+      "policy": "Frozen Web tooling only; no native product service"
+    },
+    {
+      "sourcePath": "upstream:scripts/local-music-credits.mjs",
+      "target": "src/services/IMetadataProvider.h + src/services/metadata/MetadataMerge.cpp",
+      "policy": "Preserve imported local credits and their sources; no native QQ network provider"
+    },
+    {
+      "sourcePath": "upstream:scripts/music-audio.mjs",
+      "target": null,
+      "policy": "Frozen Web tooling only; no native product service"
+    },
+    {
+      "sourcePath": "upstream:scripts/music-library.mjs",
+      "target": "src/library/ + src/media/MediaMetadataProbe.cpp + src/services/metadata/MusicBrainzSource.cpp",
+      "policy": "Read-only scan/import, native metadata/artwork cache and authorized MusicBrainz matching"
+    },
+    {
+      "sourcePath": "upstream:scripts/music-server.mjs",
+      "target": null,
+      "policy": "Frozen Web tooling only; no native product service"
+    },
+    {
+      "sourcePath": "upstream:scripts/pwa-worker.js",
+      "target": null,
+      "policy": "Frozen Web tooling only; no native product service"
+    },
+    {
+      "sourcePath": "upstream:scripts/qq-credits.mjs",
+      "target": "src/services/IMetadataProvider.h + src/services/metadata/MetadataMerge.cpp",
+      "policy": "Preserve imported local credits and their sources; no native QQ network provider"
+    }
+  ],
+  "upstreamRepository": "https://github.com/RonaldDeng/Rhine-Music-Demo"
+}

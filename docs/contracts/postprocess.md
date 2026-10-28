@@ -1,0 +1,39 @@
+# 雾、Bokeh、SMAA与最终输出
+
+本文维护后处理源算法与组件公式检查；SSAO/画质归[occlusion.md](occlusion.md)，附件/上传图归[rhi-postprocess.md](rhi-postprocess.md)。冻结scene.ts及锁定Three的来源/lookup hash在`resources/manifests/postprocess.json`。下列状态、帧数与重建次数描述现有工具覆盖能力，实际缺口和必要入口调整按[test-gates.md](test-gates.md)选择，不自动形成逐pass全跑或重复压力任务。
+
+## 顺序与颜色
+
+线性不透明捕获→线性壳体→SSAO→Bokeh→SMAA→一次ACES exposure/精确sRGB。纸面toneMapped=false的入射/限亮语义保留，最终OutputPass仍转换整幅composer（含纸面/背景）。生产GlassMaterial.compositorOutput不提前tone-map；隔离直接材质Review的ACES路径不进入生产。
+
+raw AO/normal/depth/linearColor绕过全部最终转换。浏览器线性诊断须追加identity ShaderPass，防止单RenderPass自动renderToScreen；以真正调用路径判断颜色域。文字/阅读层在三维之后。
+
+## 线性雾
+
+- 使用实际渲染相机距离与detail：near=`distance+lerp(5,-1,detail)`，far=`distance+lerp(25,12,detail)`；仅detail变化也须更新。viewDepth=-viewZ，以`smoothstep(near,far,viewDepth)`混合线性主题fogColor。
+- 纸面/不透明地面在各自源着色后、capture/resolve/mips前加雾；壳体在BRDF、透射/Beer及光场完成后加自身表面雾，不能对同一表面重复处理。背景、normal、depth不加雾。
+- 雾先于SSAO/Bokeh/SMAA及一次ACES/sRGB；生产始终启用，rawOutput仅供Review。
+- `rhi-fog-gpu`覆盖84源helper状态、RGBA16F误差<.001及一次SG重建；生产1200帧核对真正上传的uniform，单独雾/主题更新不得重建无关资源。
+
+## Bokeh
+
+- 初始focus25/aperture.0018，实际帧focus为view空间`entityOrigin+(0,2,0)`正深度，aperture=`(.0003+.0005*detail)*depthOfField/100`，maxblur=.011。
+- 固定41次color采样、.9/.7/.4环、aspect修正、正负CoC及±.011限幅、alpha=1；RGB24 linear depth nearest，color线性/clamp-to-edge，独立完整几何深度，不能用仅不透明主通道代替。
+- `rhi-bokeh-gpu`直接生产Postprocess/qsb真实QRhi offscreen：36组129×73/257×193/193×257、focus20/25/30、aperture0/.0003/.0008/.0012，加一次reset/recreate与另一组clip.1/1000。独立double双线性/源41点核对所有解析像素，颜色≤3/255、有限/HDR/alpha精确1，覆盖前后景/焦平面/限幅/边界。
+- `rhi-flicker-gpu`生产1200帧另核对真正上传的focus/aperture/aspect/clip/maxblur和完整DOF尺寸。41点独立核输入保存在`tests/fixtures/postprocess/bokeh-kernel.json`，由组件回归核对。
+
+## SMAA
+
+- 生产颜色阈值.05、最多32步，保留锁定源helper和lookup：160×560 area线性/66×33 search nearest，gamma2.2及alpha混合。lookup原内嵌PNG→RGBA8，flipY=false解码行序，不转sRGB、不建mip；framebuffer Y变换不能作用于lookup。
+- 源crossing宏`float(ivec2)`取首分量后广播：(1,0)两轴各+1，(0,1)不增轴并保留调用前y减1，独立公式必须遵守该语义。
+- `rhi-smaa-gpu`直接生产三pass真正离屏；状态覆盖64×64/129×73/73×129、七种解析模式、动态后flat清零与一次重建。edges≤1/255、weights/blend≤3/255，全部RGBA通道有限，HDR/变化alpha保持。
+
+HDR最终输出扩展由[display-output.md](display-output.md)维护；此处SDR颜色和独立后处理公式门槛不变。
+
+## AA与执行边界
+
+生产始终启用几何MSAA和SMAA；屏幕空间尺寸执行occlusion.md。实际样本数/resolve/部分覆盖由几何与壳体检查证明，SSAA仅Review诊断，不是产品预设或绕过目标上限的方法。
+
+Bokeh/SMAA独立项无swapchain/可见窗口，GL fallback surface须活到QRhi销毁之后。`ctest --preset qt-release-render -R '^rhi-(bokeh|smaa)-gpu$'`运行组件公式；完整资源图/计数在rhi-postprocess.md维护。来源适配理由见[source-fidelity-review.md](source-fidelity-review.md#算法与资源图)。MSAA/resolve与生产组合入口见rhi-postprocess.md；目标尺度与BLUR修正的集成入口见rhi-integration.md。
+
+`resources/shaders/gaussian-blur.glsl`统一执行各二维背景的有序高斯累加，各调用shader保留自己的来源sigma与成对权重表；审计从指定表读取核，不把其他vec2常量算作采样。RHI后处理入口通过`post-input.glsl`共享std140输入，并直接包含共享源算法核；SSAO的16/32/64入口以编译期宏选择`ssao-body.glsl`的完整有序样本。

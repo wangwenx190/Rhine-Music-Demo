@@ -1,0 +1,185 @@
+{
+    "clockRule": "musicOpeningFrame.contour: settle(unit(t,0.24,1.64)); accents also use original symbols envelope; no duration change",
+    "paths": [
+        {
+            "d": "M24 72 L49 123 Q56 137 68 113 L91 66",
+            "end": 0.06801503192878937,
+            "group": "word",
+            "id": "y-down",
+            "length": 138.15179272073524,
+            "offset": 0,
+            "start": 0,
+            "strokeWidth": 16
+        },
+        {
+            "d": "M91 66 L57 162 Q51 180 30 180",
+            "end": 0.13542705822705897,
+            "group": "word",
+            "id": "y-tail",
+            "length": 136.92697069956466,
+            "offset": 138.15179272073524,
+            "start": 0.06801503192878937,
+            "strokeWidth": 16
+        },
+        {
+            "d": "M174 101 C174 57 112 57 112 101 C112 145 174 145 174 101Z",
+            "end": 0.2354171338552491,
+            "group": "word",
+            "id": "a-one-bowl",
+            "length": 203.09934158053758,
+            "offset": 275.0787634202999,
+            "start": 0.13542705822705897,
+            "strokeWidth": 16
+        },
+        {
+            "d": "M174 70 V133",
+            "end": 0.2664333583075475,
+            "group": "word",
+            "id": "a-one-stem",
+            "length": 63,
+            "offset": 478.1781050008375,
+            "start": 0.2354171338552491,
+            "strokeWidth": 16
+        },
+        {
+            "d": "M214 26 V123 Q214 133 228 133",
+            "end": 0.32384004583592213,
+            "group": "word",
+            "id": "l",
+            "length": 116.60417662535967,
+            "offset": 541.1781050008375,
+            "start": 0.2664333583075475,
+            "strokeWidth": 16
+        },
+        {
+            "d": "M306 101 C306 57 244 57 244 101 C244 145 306 145 306 101Z",
+            "end": 0.42383012146411225,
+            "group": "word",
+            "id": "a-two-bowl",
+            "length": 203.09934158053758,
+            "offset": 657.7822816261971,
+            "start": 0.32384004583592213,
+            "strokeWidth": 16
+        },
+        {
+            "d": "M306 70 V133",
+            "end": 0.4548463459164107,
+            "group": "word",
+            "id": "a-two-stem",
+            "length": 63,
+            "offset": 860.8816232067347,
+            "start": 0.42383012146411225,
+            "strokeWidth": 16
+        },
+        {
+            "d": "M346 26 V133",
+            "end": 0.5075246953830127,
+            "group": "word",
+            "id": "h-stem",
+            "length": 107,
+            "offset": 923.8816232067347,
+            "start": 0.4548463459164107,
+            "strokeWidth": 16
+        },
+        {
+            "d": "M346 97 C346 57 412 57 412 96 V133",
+            "end": 0.5746944932765287,
+            "group": "word",
+            "id": "h-arch",
+            "length": 136.43495757517704,
+            "offset": 1030.8816232067347,
+            "start": 0.5075246953830127,
+            "strokeWidth": 16
+        },
+        {
+            "d": "M483 32 C551 32 551 136 483 136 C415 136 415 32 483 32Z",
+            "end": 0.7355985989721764,
+            "group": "rings",
+            "id": "O-one",
+            "length": 326.82761483158606,
+            "offset": 1167.3165807819119,
+            "start": 0.5746944932765287,
+            "strokeWidth": 18
+        },
+        {
+            "d": "M606 32 C674 32 674 136 606 136 C538 136 538 32 606 32Z",
+            "end": 0.8965027046678241,
+            "group": "rings",
+            "id": "O-two",
+            "length": 326.82761483158606,
+            "offset": 1494.144195613498,
+            "start": 0.7355985989721764,
+            "strokeWidth": 18
+        },
+        {
+            "d": "M695 34 L692 100",
+            "end": 0.9290294422111457,
+            "group": "accents",
+            "id": "bang-one",
+            "length": 66.06814663663572,
+            "offset": 1820.971810445084,
+            "start": 0.8965027046678241,
+            "strokeWidth": 16
+        },
+        {
+            "d": "M692 130 L692 130.01",
+            "end": 0.9290343654213762,
+            "group": "accents",
+            "id": "dot-one",
+            "length": 0.009999999999990905,
+            "offset": 1887.0399570817196,
+            "start": 0.9290294422111457,
+            "strokeWidth": 16
+        },
+        {
+            "d": "M736 30 L733 100",
+            "end": 0.9635284717241972,
+            "group": "accents",
+            "id": "bang-two",
+            "length": 70.06425622241343,
+            "offset": 1887.0499570817196,
+            "start": 0.9290343654213762,
+            "strokeWidth": 16
+        },
+        {
+            "d": "M733 130 L733 130.01",
+            "end": 0.9635333949344277,
+            "group": "accents",
+            "id": "dot-two",
+            "length": 0.009999999999990905,
+            "offset": 1957.114213304133,
+            "start": 0.9635284717241972,
+            "strokeWidth": 16
+        },
+        {
+            "d": "M777 26 L774 100",
+            "end": 0.9999950767897695,
+            "group": "accents",
+            "id": "bang-three",
+            "length": 74.06078584514209,
+            "offset": 1957.124213304133,
+            "start": 0.9635333949344277,
+            "strokeWidth": 16
+        },
+        {
+            "d": "M774 130 L774 130.01",
+            "end": 1,
+            "group": "accents",
+            "id": "dot-three",
+            "length": 0.009999999999990905,
+            "offset": 2031.1849991492752,
+            "start": 0.9999950767897695,
+            "strokeWidth": 16
+        }
+    ],
+    "progressRule": "clamp((contourProgress-start)/(end-start),0,1); arc length, not Bezier parameter",
+    "schemaVersion": 1,
+    "terminalRule": "reduced motion: show complete production logo; reveal at 1 replaces only inner groove details with full logo",
+    "totalLength": 2031.1949991492752,
+    "viewBox": [
+        0,
+        0,
+        816,
+        208
+    ]
+}
